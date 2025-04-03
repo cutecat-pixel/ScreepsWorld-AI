@@ -27,6 +27,12 @@ if [ ! -d "node_modules" ]; then
     npm install
 fi
 
+# 如果有.env文件，加载环境变量
+if [ -f ".env" ]; then
+    echo "加载环境变量..."
+    export $(cat .env | xargs)
+fi
+
 # 运行部署命令
 echo "正在部署代码..."
 npm run deploy

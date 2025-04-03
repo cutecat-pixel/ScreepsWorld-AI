@@ -7,8 +7,14 @@
 
 echo "===== Screeps高级部署脚本 ====="
 
+# 加载环境变量
+if [ -f ".env" ]; then
+    echo "加载环境变量..."
+    export $(cat .env | xargs)
+fi
+
 # 默认配置
-DEFAULT_BRANCH="default"
+DEFAULT_BRANCH=${SCREEPS_BRANCH:-"default"}
 DEFAULT_SERVER="main" # main是普通服务器，season是季节服务器
 
 # 分支名称 (第一个参数，如未提供则使用default)
@@ -57,6 +63,9 @@ if [ ! -d "node_modules" ]; then
     npm install
 fi
 
+# 设置环境变量
+export SCREEPS_BRANCH=$BRANCH
+
 # 修改Gruntfile.js中的分支和服务器配置
 echo "正在配置部署设置..."
 
@@ -71,9 +80,6 @@ else
     # 禁用season服务器配置
     sed -i "s/server: 'season'/\/\/server: 'season'/" Gruntfile.js
 fi
-
-# 更新分支名称
-sed -i "s/branch: '[^']*'/branch: '$BRANCH'/" Gruntfile.js
 
 # 运行部署命令
 echo "正在部署代码到分支[$BRANCH] 服务器[$SERVER]..."
