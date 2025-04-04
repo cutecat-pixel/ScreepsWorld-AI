@@ -83,42 +83,42 @@ const towerManager = {
             return;
         }
         
-        // 其次修理受损的一般结构(低于80%生命值，不包括墙和城墙)
-        const damagedStructures = tower.pos.findClosestByRange(FIND_STRUCTURES, {
-            filter: (s) => s.hits < s.hitsMax * 0.8 &&
-                          s.structureType !== STRUCTURE_WALL &&
-                          s.structureType !== STRUCTURE_RAMPART
-        });
+        // // 其次修理受损的一般结构(低于80%生命值，不包括墙和城墙)
+        // const damagedStructures = tower.pos.findClosestByRange(FIND_STRUCTURES, {
+        //     filter: (s) => s.hits < s.hitsMax * 0.8 &&
+        //                   s.structureType !== STRUCTURE_WALL &&
+        //                   s.structureType !== STRUCTURE_RAMPART
+        // });
         
-        if(damagedStructures) {
-            tower.repair(damagedStructures);
-            return;
-        }
+        // if(damagedStructures) {
+        //     tower.repair(damagedStructures);
+        //     return;
+        // }
         
-        // 最后，如果能量很充足(>90%)，维护防御墙和城墙到一个基本水平
-        if(tower.store[RESOURCE_ENERGY] > tower.store.getCapacity(RESOURCE_ENERGY) * 0.9) {
-            let targetHits = 10000; // 默认目标生命值
+        // // 最后，如果能量很充足(>90%)，维护防御墙和城墙到一个基本水平
+        // if(tower.store[RESOURCE_ENERGY] > tower.store.getCapacity(RESOURCE_ENERGY) * 0.9) {
+        //     let targetHits = 10000; // 默认目标生命值
             
-            // 根据控制器等级调整目标生命值
-            if(tower.room.controller) {
-                const level = tower.room.controller.level;
-                if(level >= 6) targetHits = 50000;
-                else if(level >= 4) targetHits = 20000;
-            }
+        //     // 根据控制器等级调整目标生命值
+        //     if(tower.room.controller) {
+        //         const level = tower.room.controller.level;
+        //         if(level >= 6) targetHits = 50000;
+        //         else if(level >= 4) targetHits = 20000;
+        //     }
             
-            // 找出生命值低于目标值的防御结构
-            const walls = tower.room.find(FIND_STRUCTURES, {
-                filter: (s) => (s.structureType === STRUCTURE_WALL || 
-                              s.structureType === STRUCTURE_RAMPART) &&
-                              s.hits < targetHits
-            });
+        //     // 找出生命值低于目标值的防御结构
+        //     const walls = tower.room.find(FIND_STRUCTURES, {
+        //         filter: (s) => (s.structureType === STRUCTURE_WALL || 
+        //                       s.structureType === STRUCTURE_RAMPART) &&
+        //                       s.hits < targetHits
+        //     });
             
-            if(walls.length > 0) {
-                // 修理生命值最低的墙
-                const target = _.min(walls, 'hits');
-                tower.repair(target);
-            }
-        }
+        //     if(walls.length > 0) {
+        //         // 修理生命值最低的墙
+        //         const target = _.min(walls, 'hits');
+        //         tower.repair(target);
+        //     }
+        // }
     }
 };
 

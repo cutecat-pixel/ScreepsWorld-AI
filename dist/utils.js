@@ -100,6 +100,38 @@ const utils = {
     },
     
     /**
+     * 寻找除了STORAGE外最需要能量的建筑
+     * @param {Room} room - 房间对象
+     * @returns {Structure} - 最需要能量的结构，如果没有返回null
+     */
+    findEnergyNeededStructureExceptStorage: function(room) {
+        // 首先检查是否有需要能量的spawn或extension
+        const spawnOrExtension = room.find(FIND_MY_STRUCTURES, {
+            filter: s => (s.structureType === STRUCTURE_SPAWN || 
+                        s.structureType === STRUCTURE_EXTENSION) && 
+                        s.store.getFreeCapacity(RESOURCE_ENERGY) > 0
+        })[0];
+        
+        // 如果有需要能量的spawn或extension，优先返回
+        if (spawnOrExtension) {
+            return spawnOrExtension;
+        }
+        
+        // 当所有spawn和extension都满能量后，考虑tower
+        const tower = room.find(FIND_MY_STRUCTURES, {
+            filter: s => s.structureType === STRUCTURE_TOWER && 
+                        s.store.getFreeCapacity(RESOURCE_ENERGY) > 0
+        })[0];
+
+        if(tower) {
+            return tower;
+        }
+        
+        // 如果既没有spawn/extension需要能量，也没有tower需要能量，返回null
+        return null;
+    },
+    
+    /**
      * 判断一个房间是否安全
      * @param {Room} room - 房间对象
      * @returns {boolean} - 如果房间安全返回true

@@ -80,10 +80,6 @@ const roleRemoteMiner = {
                     // 在目标位置后采集
                     else {
                         creep.harvest(source);
-                        // // 如果背包满了，在当前位置自动放置一个容器工地
-                        // if(creep.store.getFreeCapacity() === 0) {
-                        //     creep.room.createConstructionSite(creep.pos, STRUCTURE_CONTAINER);
-                        // }
                     }
                 }
             }

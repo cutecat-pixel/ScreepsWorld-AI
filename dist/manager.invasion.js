@@ -123,8 +123,8 @@ const invasionManager = {
           (invasion.options.claimMode === 'reserve' || 
            (invasion.options.claimMode === 'claim' && invasion.status !== 'controller_claimed'))) {
             
-            // 每100个tick检查一次claimer状态
-            if(Game.time - invasion.lastClaimerCheck >= 100) {
+            // 每10个tick检查一次claimer状态
+            if(Game.time - invasion.lastClaimerCheck >= 10) {
                 invasion.lastClaimerCheck = Game.time;
                 
                 // 查找针对该目标房间的claimer
@@ -143,8 +143,8 @@ const invasionManager = {
         
         // 检查dismantler状态(如果拆除任务未完成)
         if(invasion.options.dismantle && !invasion.dismantleCompleted) {
-            // 每150个tick检查一次dismantler状态
-            if(Game.time - invasion.lastDismantlerCheck >= 150) {
+            // 每50个tick检查一次dismantler状态
+            if(Game.time - invasion.lastDismantlerCheck >= 50) {
                 invasion.lastDismantlerCheck = Game.time;
                 
                 // 查找针对该目标房间的dismantler
@@ -168,7 +168,7 @@ const invasionManager = {
            invasion.status === 'controller_reserved') {
             
             // 检查远程矿工状态
-            if(Game.time - invasion.lastRemoteMinerCheck >= 200) {
+            if(Game.time - invasion.lastRemoteMinerCheck >= 10) {
                 invasion.lastRemoteMinerCheck = Game.time;
                 
                 // 查找针对该目标房间的远程矿工
