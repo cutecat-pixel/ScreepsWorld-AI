@@ -50,7 +50,7 @@ const utils = {
             return droppedResources[0];;
         }
 
-        const storage = creep.room.findClosestByPath(FIND_STRUCTURES, {
+        const storage = creep.pos.findClosestByPath(FIND_STRUCTURES, {
             filter: s => s.structureType === STRUCTURE_STORAGE && 
                         s.store[RESOURCE_ENERGY] > 0
         });
