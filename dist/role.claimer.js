@@ -14,7 +14,7 @@ const claimerRole = {
         let body = [CLAIM, MOVE];
         
         // 更高级的配置，可以更快占领
-        if(energyAvailable >= 1300) {
+        if(energyAvailable >= 1300 && gameStage.level >= 5) {
             body = [CLAIM, CLAIM, MOVE, MOVE];
         }
         
