@@ -10,4 +10,6 @@ module.exports = {
     claimer: require('role.claimer'),
     dismantler: require('role.dismantler'),
     wallRepairer: require('role.wallRepairer'),
+    remoteMiner: require('role.remoteMiner'),
+    remoteHauler: require('role.remoteHauler')
 }; 

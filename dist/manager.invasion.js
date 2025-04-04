@@ -1,5 +1,7 @@
 const claimer = require('role.claimer');
 const dismantler = require('role.dismantler');
+const remoteMiner = require('role.remoteMiner');
+const remoteHauler = require('role.remoteHauler');
 
 /**
  * 入侵管理器
@@ -15,6 +17,9 @@ const invasionManager = {
      * @param {boolean} options.dismantle - 是否拆除建筑
      * @param {number} options.dismantlerCount - 拆除者数量
      * @param {string} options.claimMode - 占领模式: 'claim', 'reserve', 'attack'
+     * @param {boolean} options.remoteMining - 是否启用远程采矿（预定模式下）
+     * @param {number} options.remoteMinerCount - 远程矿工数量
+     * @param {number} options.remoteHaulerCount - 远程运输者数量
      */
     startInvasion: function(sourceRoomName, targetRoomName, options = {}) {
         // 默认选项
@@ -22,7 +27,10 @@ const invasionManager = {
             claim: true,
             dismantle: true,
             dismantlerCount: 2,
-            claimMode: 'claim'
+            claimMode: 'claim',
+            remoteMining: false,
+            remoteMinerCount: 1,
+            remoteHaulerCount: 1
         };
         
         // 合并选项
@@ -48,7 +56,9 @@ const invasionManager = {
             status: 'preparing',
             options: finalOptions,
             lastClaimerCheck: Game.time, // 添加最后检查claimer的时间
-            lastDismantlerCheck: Game.time // 添加最后检查dismantler的时间
+            lastDismantlerCheck: Game.time, // 添加最后检查dismantler的时间
+            lastRemoteMinerCheck: Game.time, // 添加最后检查远程矿工的时间
+            lastRemoteHaulerCheck: Game.time // 添加最后检查远程运输者的时间
         };
         
         console.log(`开始入侵 ${targetRoomName} (从 ${sourceRoomName})`);
@@ -60,6 +70,19 @@ const invasionManager = {
         
         if(finalOptions.claim) {
             claimer.createClaimTask(sourceRoomName, targetRoomName, finalOptions.claimMode);
+        }
+        
+        // 如果启用了远程采矿且是预定模式，创建远程矿工和运输者
+        if(finalOptions.remoteMining && finalOptions.claimMode === 'reserve') {
+            // 创建远程矿工
+            for(let i = 0; i < finalOptions.remoteMinerCount; i++) {
+                remoteMiner.createRemoteMinerTask(sourceRoomName, targetRoomName);
+            }
+            
+            // 创建远程运输者
+            for(let i = 0; i < finalOptions.remoteHaulerCount; i++) {
+                remoteHauler.createRemoteHaulerTask(sourceRoomName, targetRoomName);
+            }
         }
         
         return true;
@@ -135,6 +158,52 @@ const invasionManager = {
                     console.log(`只有 ${dismantlers.length}/${invasion.options.dismantlerCount} 的dismantler在 ${targetRoomName}，创建额外的dismantler`);
                     const needCount = invasion.options.dismantlerCount - dismantlers.length;
                     dismantler.createDismantleTask(sourceRoomName, targetRoomName, needCount);
+                }
+            }
+        }
+        
+        // 如果启用了远程采矿且房间已被预定，检查远程矿工和运输者
+        if(invasion.options.remoteMining && 
+           invasion.options.claimMode === 'reserve' && 
+           invasion.status === 'controller_reserved') {
+            
+            // 检查远程矿工状态
+            if(Game.time - invasion.lastRemoteMinerCheck >= 200) {
+                invasion.lastRemoteMinerCheck = Game.time;
+                
+                // 查找针对该目标房间的远程矿工
+                const remoteMiners = _.filter(Game.creeps, creep => 
+                    creep.memory.role === 'remoteMiner' && 
+                    creep.memory.targetRoom === targetRoomName
+                );
+                
+                // 如果远程矿工数量低于要求，创建新的
+                if(remoteMiners.length < invasion.options.remoteMinerCount) {
+                    console.log(`只有 ${remoteMiners.length}/${invasion.options.remoteMinerCount} 的远程矿工在 ${targetRoomName}，创建额外的矿工`);
+                    const needCount = invasion.options.remoteMinerCount - remoteMiners.length;
+                    for(let i = 0; i < needCount; i++) {
+                        remoteMiner.createRemoteMinerTask(sourceRoomName, targetRoomName);
+                    }
+                }
+            }
+            
+            // 检查远程运输者状态
+            if(Game.time - invasion.lastRemoteHaulerCheck >= 150) {
+                invasion.lastRemoteHaulerCheck = Game.time;
+                
+                // 查找针对该目标房间的远程运输者
+                const remoteHaulers = _.filter(Game.creeps, creep => 
+                    creep.memory.role === 'remoteHauler' && 
+                    creep.memory.targetRoom === targetRoomName
+                );
+                
+                // 如果远程运输者数量低于要求，创建新的
+                if(remoteHaulers.length < invasion.options.remoteHaulerCount) {
+                    console.log(`只有 ${remoteHaulers.length}/${invasion.options.remoteHaulerCount} 的远程运输者在 ${targetRoomName}，创建额外的运输者`);
+                    const needCount = invasion.options.remoteHaulerCount - remoteHaulers.length;
+                    for(let i = 0; i < needCount; i++) {
+                        remoteHauler.createRemoteHaulerTask(sourceRoomName, targetRoomName);
+                    }
                 }
             }
         }
@@ -238,6 +307,61 @@ const invasionManager = {
         }
         
         return Memory.invasions;
+    },
+    
+    /**
+     * 启用远程采矿功能
+     * @param {string} targetRoomName - 目标房间名称
+     * @param {number} minerCount - 矿工数量
+     * @param {number} haulerCount - 运输者数量
+     */
+    enableRemoteMining: function(targetRoomName, minerCount = 1, haulerCount = 1) {
+        if(!Memory.invasions || !Memory.invasions[targetRoomName]) {
+            console.log(`没有对 ${targetRoomName} 的入侵任务`);
+            return false;
+        }
+        
+        const invasion = Memory.invasions[targetRoomName];
+        
+        // 只有预定模式可以启用远程采矿
+        if(invasion.options.claimMode !== 'reserve') {
+            console.log(`只有预定(reserve)模式的入侵可以启用远程采矿`);
+            return false;
+        }
+        
+        invasion.options.remoteMining = true;
+        invasion.options.remoteMinerCount = minerCount;
+        invasion.options.remoteHaulerCount = haulerCount;
+        
+        console.log(`已启用对 ${targetRoomName} 的远程采矿，矿工: ${minerCount}，运输者: ${haulerCount}`);
+        
+        // 如果房间已被预定，立即创建矿工和运输者
+        if(invasion.status === 'controller_reserved') {
+            for(let i = 0; i < minerCount; i++) {
+                remoteMiner.createRemoteMinerTask(invasion.sourceRoom, targetRoomName);
+            }
+            
+            for(let i = 0; i < haulerCount; i++) {
+                remoteHauler.createRemoteHaulerTask(invasion.sourceRoom, targetRoomName);
+            }
+        }
+        
+        return true;
+    },
+    
+    /**
+     * 禁用远程采矿功能
+     * @param {string} targetRoomName - 目标房间名称
+     */
+    disableRemoteMining: function(targetRoomName) {
+        if(!Memory.invasions || !Memory.invasions[targetRoomName]) {
+            console.log(`没有对 ${targetRoomName} 的入侵任务`);
+            return false;
+        }
+        
+        Memory.invasions[targetRoomName].options.remoteMining = false;
+        console.log(`已禁用对 ${targetRoomName} 的远程采矿`);
+        return true;
     }
 };
 

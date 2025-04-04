@@ -82,9 +82,19 @@ const utils = {
             return spawnOrExtension;
         }
         
-        // 只有当所有spawn和extension都满能量后，才考虑tower
-        return room.find(FIND_MY_STRUCTURES, {
+        const tower = room.find(FIND_MY_STRUCTURES, {
             filter: s => s.structureType === STRUCTURE_TOWER && 
+                        s.store.getFreeCapacity(RESOURCE_ENERGY) > 0
+        })[0];
+
+        // 当所有spawn和extension都满能量后，考虑tower
+        if(tower) {
+            return tower;
+        }
+        
+        // 如果tower满了，返回storage
+        return room.find(FIND_STRUCTURES, {
+            filter: s => s.structureType === STRUCTURE_STORAGE && 
                         s.store.getFreeCapacity(RESOURCE_ENERGY) > 0
         })[0];
     },

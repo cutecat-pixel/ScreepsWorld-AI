@@ -15,6 +15,15 @@ global.getInvasionStatus = function() {
     return _managers.invasion.getInvasionStatus();
 };
 
+// 添加远程采矿辅助函数
+global.enableRemoteMining = function(targetRoomName, minerCount = 1, haulerCount = 1) {
+    return _managers.invasion.enableRemoteMining(targetRoomName, minerCount, haulerCount);
+};
+
+global.disableRemoteMining = function(targetRoomName) {
+    return _managers.invasion.disableRemoteMining(targetRoomName);
+};
+
 /**
  * Screeps主逻辑入口
  * 每tick会自动调用这个函数

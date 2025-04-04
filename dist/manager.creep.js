@@ -218,19 +218,34 @@ const creepManager = {
     },
     
     /**
-     * 运行所有creep的行为逻辑
+     * 运行所有creep的逻辑
      */
     runCreeps: function() {
+        // 遍历所有creep并执行它们的角色逻辑
         for(let name in Game.creeps) {
             const creep = Game.creeps[name];
-            const role = creep.memory.role;
             
-            // 如果角色有效，运行其逻辑
-            if(role && roles[role]) {
-                roles[role].run(creep);
+            // 获取角色
+            const role = creep.memory.role || 'harvester';
+            
+            // 尝试获取这个角色的模块
+            const roleModule = roles[role];
+            
+            if(roleModule) {
+                // 运行角色逻辑
+                try {
+                    roleModule.run(creep);
+                } catch(error) {
+                    console.log(`运行 ${role} ${name} 的逻辑时出错: ${error.stack}`);
+                }
             } else {
-                // 默认使用harvester逻辑
-                roles.harvester.run(creep);
+                console.log(`未找到角色 ${role} 的模块`);
+                // 默认使用harvester角色
+                try {
+                    roles.harvester.run(creep);
+                } catch(error) {
+                    console.log(`使用默认角色逻辑时出错: ${error.stack}`);
+                }
             }
         }
     }
