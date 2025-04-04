@@ -16,12 +16,12 @@ const roleWallRepairer = {
         let body = [WORK, WORK, CARRY, CARRY, MOVE, MOVE];
         
         // 中等能量配置
-        if(energyAvailable >= 500) {
+        if(energyAvailable >= 500 && gameStage >= 5) {
             body = [WORK, WORK, CARRY, CARRY, CARRY, MOVE, MOVE];
         }
         
         // 高能量配置
-        if(energyAvailable >= 1200) {
+        if(energyAvailable >= 1200 && gameStage >= 6) {
             body = [WORK, WORK, WORK, WORK, CARRY, CARRY, CARRY, CARRY, CARRY,
                     MOVE, MOVE, MOVE, MOVE, MOVE, MOVE];
         }
