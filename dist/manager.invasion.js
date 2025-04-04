@@ -116,9 +116,10 @@ const invasionManager = {
           (invasion.options.claimMode === 'reserve' || 
            (invasion.options.claimMode === 'claim' && invasion.status !== 'controller_claimed'))) {
             
-            // 查找针对该目标房间的claimer
+            // 查找针对该目标房间的claimer（同时检查homeRoom和targetRoom）
             const claimers = _.filter(Game.creeps, creep => 
                 creep.memory.role === 'claimer' && 
+                creep.memory.homeRoom === sourceRoomName &&
                 creep.memory.targetRoom === targetRoomName
             );
             
@@ -137,9 +138,10 @@ const invasionManager = {
         
         // 处理dismantler目标数量
         if(invasion.options.dismantle && !invasion.dismantleCompleted) {
-            // 查找针对该目标房间的dismantler
+            // 查找针对该目标房间的dismantler（同时检查homeRoom和targetRoom）
             const dismantlers = _.filter(Game.creeps, creep => 
                 creep.memory.role === 'dismantler' && 
+                creep.memory.homeRoom === sourceRoomName &&
                 creep.memory.targetRoom === targetRoomName
             );
             
@@ -160,9 +162,10 @@ const invasionManager = {
            invasion.options.claimMode === 'reserve' && 
            invasion.status === 'controller_reserved') {
             
-            // 查找针对该目标房间的远程矿工
+            // 查找针对该目标房间的远程矿工（同时检查homeRoom和targetRoom）
             const remoteMiners = _.filter(Game.creeps, creep => 
                 creep.memory.role === 'remoteMiner' && 
+                creep.memory.homeRoom === sourceRoomName &&
                 creep.memory.targetRoom === targetRoomName
             );
             
@@ -177,9 +180,10 @@ const invasionManager = {
                 targetRoom: targetRoomName
             };
             
-            // 查找针对该目标房间的远程运输者
+            // 查找针对该目标房间的远程运输者（同时检查homeRoom和targetRoom）
             const remoteHaulers = _.filter(Game.creeps, creep => 
                 creep.memory.role === 'remoteHauler' && 
+                creep.memory.homeRoom === sourceRoomName &&
                 creep.memory.targetRoom === targetRoomName
             );
             
