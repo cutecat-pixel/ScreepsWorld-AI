@@ -63,27 +63,8 @@ const invasionManager = {
         
         console.log(`开始入侵 ${targetRoomName} (从 ${sourceRoomName})`);
         
-        // 创建请求
-        if(finalOptions.dismantle) {
-            dismantler.createDismantleTask(sourceRoomName, targetRoomName, finalOptions.dismantlerCount);
-        }
-        
-        if(finalOptions.claim) {
-            claimer.createClaimTask(sourceRoomName, targetRoomName, finalOptions.claimMode);
-        }
-        
-        // 如果启用了远程采矿且是预定模式，创建远程矿工和运输者
-        if(finalOptions.remoteMining && finalOptions.claimMode === 'reserve') {
-            // 创建远程矿工
-            for(let i = 0; i < finalOptions.remoteMinerCount; i++) {
-                remoteMiner.createRemoteMinerTask(sourceRoomName, targetRoomName);
-            }
-            
-            // 创建远程运输者
-            for(let i = 0; i < finalOptions.remoteHaulerCount; i++) {
-                remoteHauler.createRemoteHaulerTask(sourceRoomName, targetRoomName);
-            }
-        }
+        // 初始化源房间对目标房间的creep计数目标
+        this.updateInvasionCreepTargets(targetRoomName);
         
         return true;
     },
@@ -104,108 +85,114 @@ const invasionManager = {
             
             // 只有未完成的任务才需要检查creep状态
             if(invasion.status !== 'completed' && invasion.status !== 'failed') {
-                // 检查并补充需要的creeps
-                this.checkAndReplaceCreeps(targetRoomName, invasion);
+                // 更新该入侵任务的creep目标数量
+                this.updateInvasionCreepTargets(targetRoomName);
             }
         }
     },
     
     /**
-     * 检查并补充需要的creeps
+     * 更新入侵任务所需的creep目标数量
      * @param {string} targetRoomName - 目标房间名称
-     * @param {Object} invasion - 入侵任务对象
      */
-    checkAndReplaceCreeps: function(targetRoomName, invasion) {
+    updateInvasionCreepTargets: function(targetRoomName) {
+        if(!Memory.invasions || !Memory.invasions[targetRoomName]) return;
+        
+        const invasion = Memory.invasions[targetRoomName];
         const sourceRoomName = invasion.sourceRoom;
         
-        // 只有在reserve模式或未完成的claim模式下才需要持续检查claimer
+        // 确保房间的creep目标计数存在
+        if(!Memory.rooms) Memory.rooms = {};
+        if(!Memory.rooms[sourceRoomName]) Memory.rooms[sourceRoomName] = {};
+        if(!Memory.rooms[sourceRoomName].targetCreepCounts) Memory.rooms[sourceRoomName].targetCreepCounts = {};
+        
+        const targetCounts = Memory.rooms[sourceRoomName].targetCreepCounts;
+        
+        // 确保creepConfigs对象存在
+        if(!Memory.creepConfigs) Memory.creepConfigs = {};
+        
+        // 处理claimer目标数量
         if(invasion.options.claim && 
           (invasion.options.claimMode === 'reserve' || 
            (invasion.options.claimMode === 'claim' && invasion.status !== 'controller_claimed'))) {
             
-            // 每10个tick检查一次claimer状态
-            if(Game.time - invasion.lastClaimerCheck >= 10) {
-                invasion.lastClaimerCheck = Game.time;
-                
-                // 查找针对该目标房间的claimer
-                const claimers = _.filter(Game.creeps, creep => 
-                    creep.memory.role === 'claimer' && 
-                    creep.memory.targetRoom === targetRoomName
-                );
-                
-                // 如果没有claimer，创建新的
-                if(claimers.length === 0) {
-                    console.log(`没有claimer正在前往 ${targetRoomName}，创建新的claimer`);
-                    claimer.createClaimTask(sourceRoomName, targetRoomName, invasion.options.claimMode);
-                }
-            }
+            // 查找针对该目标房间的claimer
+            const claimers = _.filter(Game.creeps, creep => 
+                creep.memory.role === 'claimer' && 
+                creep.memory.targetRoom === targetRoomName
+            );
+            
+            // 设置claimer目标数量为1或0
+            targetCounts.claimer = claimers.length === 0 ? 1 : 0;
+            
+            // 设置claimer的特殊参数
+            if(!Memory.creepConfigs.claimer) Memory.creepConfigs.claimer = {};
+            if(!Memory.creepConfigs.claimer[sourceRoomName]) Memory.creepConfigs.claimer[sourceRoomName] = {};
+            
+            Memory.creepConfigs.claimer[sourceRoomName] = {
+                targetRoom: targetRoomName,
+                mode: invasion.options.claimMode
+            };
         }
         
-        // 检查dismantler状态(如果拆除任务未完成)
+        // 处理dismantler目标数量
         if(invasion.options.dismantle && !invasion.dismantleCompleted) {
-            // 每50个tick检查一次dismantler状态
-            if(Game.time - invasion.lastDismantlerCheck >= 50) {
-                invasion.lastDismantlerCheck = Game.time;
-                
-                // 查找针对该目标房间的dismantler
-                const dismantlers = _.filter(Game.creeps, creep => 
-                    creep.memory.role === 'dismantler' && 
-                    creep.memory.targetRoom === targetRoomName
-                );
-                
-                // 如果dismantler数量低于要求，创建新的
-                if(dismantlers.length < invasion.options.dismantlerCount) {
-                    console.log(`只有 ${dismantlers.length}/${invasion.options.dismantlerCount} 的dismantler在 ${targetRoomName}，创建额外的dismantler`);
-                    const needCount = invasion.options.dismantlerCount - dismantlers.length;
-                    dismantler.createDismantleTask(sourceRoomName, targetRoomName, needCount);
-                }
-            }
+            // 查找针对该目标房间的dismantler
+            const dismantlers = _.filter(Game.creeps, creep => 
+                creep.memory.role === 'dismantler' && 
+                creep.memory.targetRoom === targetRoomName
+            );
+            
+            // 设置dismantler目标数量
+            targetCounts.dismantler = Math.max(0, invasion.options.dismantlerCount - dismantlers.length);
+            
+            // 设置dismantler的特殊参数
+            if(!Memory.creepConfigs.dismantler) Memory.creepConfigs.dismantler = {};
+            if(!Memory.creepConfigs.dismantler[sourceRoomName]) Memory.creepConfigs.dismantler[sourceRoomName] = {};
+            
+            Memory.creepConfigs.dismantler[sourceRoomName] = {
+                targetRoom: targetRoomName
+            };
         }
         
-        // 如果启用了远程采矿且房间已被预定，检查远程矿工和运输者
+        // 处理远程矿工和运输者
         if(invasion.options.remoteMining && 
            invasion.options.claimMode === 'reserve' && 
            invasion.status === 'controller_reserved') {
             
-            // 检查远程矿工状态
-            if(Game.time - invasion.lastRemoteMinerCheck >= 10) {
-                invasion.lastRemoteMinerCheck = Game.time;
-                
-                // 查找针对该目标房间的远程矿工
-                const remoteMiners = _.filter(Game.creeps, creep => 
-                    creep.memory.role === 'remoteMiner' && 
-                    creep.memory.targetRoom === targetRoomName
-                );
-                
-                // 如果远程矿工数量低于要求，创建新的
-                if(remoteMiners.length < invasion.options.remoteMinerCount) {
-                    console.log(`只有 ${remoteMiners.length}/${invasion.options.remoteMinerCount} 的远程矿工在 ${targetRoomName}，创建额外的矿工`);
-                    const needCount = invasion.options.remoteMinerCount - remoteMiners.length;
-                    for(let i = 0; i < needCount; i++) {
-                        remoteMiner.createRemoteMinerTask(sourceRoomName, targetRoomName);
-                    }
-                }
-            }
+            // 查找针对该目标房间的远程矿工
+            const remoteMiners = _.filter(Game.creeps, creep => 
+                creep.memory.role === 'remoteMiner' && 
+                creep.memory.targetRoom === targetRoomName
+            );
             
-            // 检查远程运输者状态
-            if(Game.time - invasion.lastRemoteHaulerCheck >= 150) {
-                invasion.lastRemoteHaulerCheck = Game.time;
-                
-                // 查找针对该目标房间的远程运输者
-                const remoteHaulers = _.filter(Game.creeps, creep => 
-                    creep.memory.role === 'remoteHauler' && 
-                    creep.memory.targetRoom === targetRoomName
-                );
-                
-                // 如果远程运输者数量低于要求，创建新的
-                if(remoteHaulers.length < invasion.options.remoteHaulerCount) {
-                    console.log(`只有 ${remoteHaulers.length}/${invasion.options.remoteHaulerCount} 的远程运输者在 ${targetRoomName}，创建额外的运输者`);
-                    const needCount = invasion.options.remoteHaulerCount - remoteHaulers.length;
-                    for(let i = 0; i < needCount; i++) {
-                        remoteHauler.createRemoteHaulerTask(sourceRoomName, targetRoomName);
-                    }
-                }
-            }
+            // 设置远程矿工目标数量
+            targetCounts.remoteMiner = Math.max(0, invasion.options.remoteMinerCount - remoteMiners.length);
+            
+            // 设置远程矿工的特殊参数
+            if(!Memory.creepConfigs.remoteMiner) Memory.creepConfigs.remoteMiner = {};
+            if(!Memory.creepConfigs.remoteMiner[sourceRoomName]) Memory.creepConfigs.remoteMiner[sourceRoomName] = {};
+            
+            Memory.creepConfigs.remoteMiner[sourceRoomName] = {
+                targetRoom: targetRoomName
+            };
+            
+            // 查找针对该目标房间的远程运输者
+            const remoteHaulers = _.filter(Game.creeps, creep => 
+                creep.memory.role === 'remoteHauler' && 
+                creep.memory.targetRoom === targetRoomName
+            );
+            
+            // 设置远程运输者目标数量
+            targetCounts.remoteHauler = Math.max(0, invasion.options.remoteHaulerCount - remoteHaulers.length);
+            
+            // 设置远程运输者的特殊参数
+            if(!Memory.creepConfigs.remoteHauler) Memory.creepConfigs.remoteHauler = {};
+            if(!Memory.creepConfigs.remoteHauler[sourceRoomName]) Memory.creepConfigs.remoteHauler[sourceRoomName] = {};
+            
+            Memory.creepConfigs.remoteHauler[sourceRoomName] = {
+                targetRoom: targetRoomName
+            };
         }
     },
     
@@ -292,6 +279,18 @@ const invasionManager = {
             return false;
         }
         
+        // 获取源房间名称
+        const sourceRoomName = Memory.invasions[targetRoomName].sourceRoom;
+        
+        // 清除该任务相关的creep目标数量
+        if(Memory.rooms && Memory.rooms[sourceRoomName] && Memory.rooms[sourceRoomName].targetCreepCounts) {
+            const targetCounts = Memory.rooms[sourceRoomName].targetCreepCounts;
+            delete targetCounts.claimer;
+            delete targetCounts.dismantler;
+            delete targetCounts.remoteMiner;
+            delete targetCounts.remoteHauler;
+        }
+        
         console.log(`取消对 ${targetRoomName} 的入侵任务`);
         delete Memory.invasions[targetRoomName];
         return true;
@@ -333,18 +332,10 @@ const invasionManager = {
         invasion.options.remoteMinerCount = minerCount;
         invasion.options.remoteHaulerCount = haulerCount;
         
-        console.log(`已启用对 ${targetRoomName} 的远程采矿，矿工: ${minerCount}，运输者: ${haulerCount}`);
+        // 更新creep目标数量
+        this.updateInvasionCreepTargets(targetRoomName);
         
-        // 如果房间已被预定，立即创建矿工和运输者
-        if(invasion.status === 'controller_reserved') {
-            for(let i = 0; i < minerCount; i++) {
-                remoteMiner.createRemoteMinerTask(invasion.sourceRoom, targetRoomName);
-            }
-            
-            for(let i = 0; i < haulerCount; i++) {
-                remoteHauler.createRemoteHaulerTask(invasion.sourceRoom, targetRoomName);
-            }
-        }
+        console.log(`已启用对 ${targetRoomName} 的远程采矿，矿工: ${minerCount}，运输者: ${haulerCount}`);
         
         return true;
     },
@@ -360,6 +351,15 @@ const invasionManager = {
         }
         
         Memory.invasions[targetRoomName].options.remoteMining = false;
+        
+        // 清除远程矿工和运输者的目标数量
+        const sourceRoomName = Memory.invasions[targetRoomName].sourceRoom;
+        if(Memory.rooms && Memory.rooms[sourceRoomName] && Memory.rooms[sourceRoomName].targetCreepCounts) {
+            const targetCounts = Memory.rooms[sourceRoomName].targetCreepCounts;
+            delete targetCounts.remoteMiner;
+            delete targetCounts.remoteHauler;
+        }
+        
         console.log(`已禁用对 ${targetRoomName} 的远程采矿`);
         return true;
     }

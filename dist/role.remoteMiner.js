@@ -17,73 +17,19 @@ const roleRemoteMiner = {
             return;
         }
         
-        // 如果没有分配目标源，查找并分配一个
-        if(!creep.memory.sourceId) {
-            this.assignSource(creep);
-        }
-        
-        // 获取分配的能量源
-        const source = Game.getObjectById(creep.memory.sourceId);
-        if(!source) {
-            // 如果能量源不存在，重新分配
-            this.assignSource(creep);
-            return;
-        }
-        
-        // 查找源点附近的容器
-        const containers = source.pos.findInRange(FIND_STRUCTURES, 1, {
-            filter: s => s.structureType === STRUCTURE_CONTAINER
-        });
-        
-        // 如果附近有容器
-        if(containers.length > 0) {
-            const container = containers[0];
-            
-            // 如果矿工不在容器上，移动到容器上
-            if(!creep.pos.isEqualTo(container.pos)) {
-                creep.moveTo(container, {visualizePathStyle: {stroke: '#ffaa00'}});
+        // 如果已经在目标房间，开始采集
+        // 寻找能量源
+        const source = creep.pos.findClosestByPath(FIND_SOURCES);
+                    
+        if(source) {
+            if(creep.harvest(source) === ERR_NOT_IN_RANGE) {
+                    creep.moveTo(source, {visualizePathStyle: {stroke: '#ffaa00'}});
             }
-            // 已经站在容器上了，开始采集
             else {
                 creep.harvest(source);
             }
         }
-        // 如果附近没有容器，直接移动到源点旁边采集
-        else {
-            // 寻找源点附近的建筑工地（可能是正在建造的容器）
-            const constructionSites = source.pos.findInRange(FIND_CONSTRUCTION_SITES, 1, {
-                filter: s => s.structureType === STRUCTURE_CONTAINER
-            });
-            
-            // 如果有容器的建筑工地
-            if(constructionSites.length > 0) {
-                const site = constructionSites[0];
-                // 移动到工地上
-                if(!creep.pos.isEqualTo(site.pos)) {
-                    creep.moveTo(site, {visualizePathStyle: {stroke: '#ffaa00'}});
-                }
-                // 站在工地上后，采集源点并尝试建造容器
-                else {
-                    creep.harvest(source);
-                    creep.build(site);
-                }
-            }
-            // 如果连工地都没有，直接移动到源点附近
-            else {
-                // 找到源点附近的空位
-                const positions = this.findAdjacentPositions(source.pos);
-                if(positions.length > 0) {
-                    // 如果不在目标位置，移动过去
-                    if(!creep.pos.isEqualTo(positions[0])) {
-                        creep.moveTo(positions[0], {visualizePathStyle: {stroke: '#ffaa00'}});
-                    }
-                    // 在目标位置后采集
-                    else {
-                        creep.harvest(source);
-                    }
-                }
-            }
-        }
+        
     },
     
     /**

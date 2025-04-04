@@ -18,42 +18,36 @@ const roleRemoteHauler = {
             // 如果不在主房间，返回主房间
             if(creep.memory.homeRoom && creep.room.name !== creep.memory.homeRoom) {
                 const exitDir = Game.map.findExit(creep.room, creep.memory.homeRoom);
-                const exit = creep.pos.findClosestByRange(exitDir);
+                const exit = creep.pos.findClosestByPath(exitDir);
                 creep.moveTo(exit, {visualizePathStyle: {stroke: '#ffffff'}});
                 creep.say('返回');
                 return;
             }
-            
+
             // 已经在主房间，寻找需要能量的建筑
-            const target = utils.findEnergyNeededStructure(creep.room);
-            
+            const target = creep.room.find(FIND_STRUCTURES, {
+                filter: s => s.structureType === STRUCTURE_STORAGE && 
+                            s.store.getFreeCapacity(RESOURCE_ENERGY) > 0
+            })[0];
+
             if(target) {
                 // 尝试将能量转移到目标
                 if(creep.transfer(target, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
                     creep.moveTo(target, {visualizePathStyle: {stroke: '#ffffff'}});
                 }
             }
+
             // 如果所有建筑都满了，检查是否主房间所有能量存储设施都满了
             else {
-                const isMainRoomFull = this.isMainRoomEnergyFull(creep.room);
-                if(isMainRoomFull) {
-                    // 如果主房间满了，切换到待命状态
-                    creep.memory.waiting = true;
-                    creep.say('⏸️ 待命');
+                // 换到待命状态
+                creep.memory.waiting = true;
+                creep.say('⏸️ 待命');
                     
-                    // 移动到房间中心待命区域
-                    creep.moveTo(new RoomPosition(25, 25, creep.room.name), {
-                        visualizePathStyle: {stroke: '#ffff00'},
-                        range: 5
-                    });
-                } else {
-                    // 主房间不满，尝试升级控制器
-                    if(creep.room.controller) {
-                        if(creep.upgradeController(creep.room.controller) === ERR_NOT_IN_RANGE) {
-                            creep.moveTo(creep.room.controller, {visualizePathStyle: {stroke: '#ffffff'}});
-                        }
-                    }
-                }
+                // 移动到房间中心待命区域
+                creep.moveTo(new RoomPosition(25, 25, creep.room.name), {
+                    visualizePathStyle: {stroke: '#ffff00'},
+                    range: 10
+                });
             }
         }
         // 如果在收集模式，需要去目标房间收集能量

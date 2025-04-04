@@ -28,7 +28,6 @@ const roleHarvester = {
             else {
                 // 去升级控制器
                 if(creep.room.controller) {
-                    creep.say('🔼 升级');
                     if(creep.upgradeController(creep.room.controller) === ERR_NOT_IN_RANGE) {
                         creep.moveTo(creep.room.controller, {visualizePathStyle: {stroke: '#ffffff'}});
                     }
@@ -49,7 +48,6 @@ const roleHarvester = {
                 
                 // 如果有存储且里面有能量，优先从存储中获取
                 if(storage) {
-                    creep.say('📦 拾走');
                     if(creep.withdraw(storage, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
                         creep.moveTo(storage, {visualizePathStyle: {stroke: '#ffaa00'}});
                     }
@@ -65,7 +63,6 @@ const roleHarvester = {
                     })[0];
 
                     if(containers) {
-                        creep.say('📦 拾走');
                         if(creep.withdraw(containers, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
                             creep.moveTo(containers, {visualizePathStyle: {stroke: '#ffaa00'}});
                         }
@@ -76,9 +73,11 @@ const roleHarvester = {
                         const source = creep.pos.findClosestByPath(FIND_SOURCES);
                         
                         if(source) {
-                            creep.say('⛏️ 采集');
                             if(creep.harvest(source) === ERR_NOT_IN_RANGE) {
                                 creep.moveTo(source, {visualizePathStyle: {stroke: '#ffaa00'}});
+                            }
+                            else {
+                                creep.harvest(source);
                             }
                         }
                     }   
@@ -90,10 +89,11 @@ const roleHarvester = {
                 const source = creep.pos.findClosestByPath(FIND_SOURCES);
                     
                 if(source) {
-                    creep.say('⛏️ 采集');
-                        // 尝试从能量源采集
                     if(creep.harvest(source) === ERR_NOT_IN_RANGE) {
                             creep.moveTo(source, {visualizePathStyle: {stroke: '#ffaa00'}});
+                    }
+                    else {
+                        creep.harvest(source);
                     }
                 }
             }

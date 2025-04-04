@@ -15,6 +15,9 @@ const creepManager = {
         // 获取该房间应该有的各角色creep数量
         const targetCounts = gameStageManager.getCreepCountsByRole(room, gameStage);
         
+        // 检查并添加入侵相关的creep目标数量
+        this.addInvasionCreepCounts(room.name, targetCounts);
+        
         // 统计当前各角色的creep数量
         const currentCounts = this.countCreepsByRole(room);
         
@@ -40,10 +43,91 @@ const creepManager = {
             
             // 如果这个角色的creep数量不足，生成新的
             if(currentCount < targetCount) {
-                this.spawnCreep(room, spawns[0], role, gameStage);
+                // 检查是否是入侵相关的角色
+                if(['claimer', 'dismantler', 'remoteMiner', 'remoteHauler'].includes(role)) {
+                    this.spawnInvasionCreep(room, spawns[0], role, gameStage);
+                } else {
+                    this.spawnCreep(room, spawns[0], role, gameStage);
+                }
                 // 一次只生成一个creep
                 return;
             }
+        }
+    },
+    
+    /**
+     * 添加入侵相关的creep目标数量
+     * @param {string} roomName - 房间名称
+     * @param {Object} targetCounts - 目标数量对象
+     */
+    addInvasionCreepCounts: function(roomName, targetCounts) {
+        // 从内存中获取特定入侵角色的目标数量
+        if(Memory.rooms && Memory.rooms[roomName] && Memory.rooms[roomName].targetCreepCounts) {
+            const invasionCounts = Memory.rooms[roomName].targetCreepCounts;
+            
+            // 将入侵角色的目标数量添加到总目标中
+            for(const role of ['claimer', 'dismantler', 'remoteMiner', 'remoteHauler']) {
+                if(invasionCounts[role]) {
+                    targetCounts[role] = (targetCounts[role] || 0) + invasionCounts[role];
+                }
+            }
+        }
+    },
+    
+    /**
+     * 生成入侵相关的creep
+     * @param {Room} room - 房间对象
+     * @param {StructureSpawn} spawn - spawn结构对象
+     * @param {string} role - 要生成的角色名称
+     * @param {Object} gameStage - 游戏阶段对象
+     */
+    spawnInvasionCreep: function(room, spawn, role, gameStage) {
+        // 获取角色的特殊配置
+        const config = Memory.creepConfigs && 
+                      Memory.creepConfigs[role] && 
+                      Memory.creepConfigs[role][room.name];
+        
+        if(!config) {
+            console.log(`错误: 没有找到 ${role} 在 ${room.name} 的配置信息`);
+            return;
+        }
+        
+        // 获取可用能量
+        const energyAvailable = room.energyAvailable;
+        
+        // 尝试获取这个角色的模块
+        const roleModule = roles[role];
+        
+        if(!roleModule) {
+            console.log(`无法找到角色模块: ${role}`);
+            return;
+        }
+        
+        // 获取适合当前能量的身体部件
+        const body = roleModule.getBody(energyAvailable, gameStage);
+        
+        // 创建唯一名称
+        const newName = role + Game.time;
+        
+        // 准备内存对象
+        const memory = {
+            role: role,
+            working: false,
+            homeRoom: room.name,
+            targetRoom: config.targetRoom
+        };
+        
+        // 添加特定角色的额外内存属性
+        if(role === 'claimer' && config.mode) {
+            memory.mode = config.mode;
+        }
+        
+        // 尝试生成新的creep
+        const result = spawn.spawnCreep(body, newName, { memory });
+        
+        // 如果成功生成，输出通知
+        if(result === OK) {
+            console.log(`${room.name} 正在生成新的 ${role}: ${newName} 目标房间: ${config.targetRoom}`);
         }
     },
     
@@ -151,7 +235,7 @@ const creepManager = {
      */
     getCreepPriorityOrder: function(room, gameStage) {
         // 基本优先级顺序
-        let priorityOrder = ['harvester', 'upgrader', 'builder', 'repairer', 'miner', 'hauler', 'defender', 'wallRepairer', 'claimer', 'dismantler'];
+        let priorityOrder = ['harvester', 'upgrader', 'builder', 'repairer', 'miner', 'hauler', 'defender', 'wallRepairer', 'claimer', 'dismantler', 'remoteMiner', 'remoteHauler'];
         
         // 紧急情况的优先级调整
         
@@ -171,7 +255,7 @@ const creepManager = {
         // 根据游戏阶段调整优先级
         if(gameStage.level >= 3) {
             // 中期以上阶段，矿工和运输者的优先级提高
-            priorityOrder = ['harvester', 'miner', 'hauler', 'upgrader', 'builder', 'repairer', 'defender', 'wallRepairer', 'claimer', 'dismantler'];
+            priorityOrder = ['harvester', 'miner', 'hauler', 'upgrader', 'builder', 'repairer', 'defender', 'wallRepairer', 'claimer', 'dismantler', 'remoteMiner', 'remoteHauler'];
         }
         
         return priorityOrder;
