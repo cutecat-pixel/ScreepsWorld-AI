@@ -20,7 +20,6 @@ const roleRemoteHauler = {
                 const exitDir = Game.map.findExit(creep.room, creep.memory.homeRoom);
                 const exit = creep.pos.findClosestByPath(exitDir);
                 creep.moveTo(exit, {visualizePathStyle: {stroke: '#ffffff'}});
-                creep.say('返回');
                 return;
             }
 
@@ -41,7 +40,6 @@ const roleRemoteHauler = {
             else {
                 // 换到待命状态
                 creep.memory.waiting = true;
-                creep.say('⏸️ 待命');
                     
                 // 移动到房间中心待命区域
                 creep.moveTo(new RoomPosition(25, 25, creep.room.name), {
@@ -60,7 +58,6 @@ const roleRemoteHauler = {
                 const exitDir = Game.map.findExit(creep.room, creep.memory.targetRoom);
                 const exit = creep.pos.findClosestByRange(exitDir);
                 creep.moveTo(exit, {visualizePathStyle: {stroke: '#ffaa00'}});
-                creep.say('前往');
                 return;
             }
             
