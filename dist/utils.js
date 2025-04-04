@@ -31,8 +31,7 @@ const utils = {
 
         // 检查有能量的容器和存储
         const container = creep.pos.findClosestByPath(FIND_STRUCTURES, {
-            filter: s => (s.structureType === STRUCTURE_CONTAINER || 
-                        s.structureType === STRUCTURE_STORAGE) && 
+            filter: s => (s.structureType === STRUCTURE_CONTAINER) && 
                         s.store[RESOURCE_ENERGY] > creep.store.getFreeCapacity()
         });
         
@@ -49,6 +48,15 @@ const utils = {
             // 按照数量排序资源
             droppedResources.sort((a, b) => b.amount - a.amount); 
             return droppedResources[0];;
+        }
+
+        const storage = creep.room.findClosestByPath(FIND_STRUCTURES, {
+            filter: s => s.structureType === STRUCTURE_STORAGE && 
+                        s.store[RESOURCE_ENERGY] > 0
+        });
+
+        if(storage) {
+            return storage;
         }
         
         // 然后检查墓碑中的能量
