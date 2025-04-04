@@ -52,17 +52,23 @@ const roleBuilder = {
             const energySource = utils.findEnergySource(creep);
             
             if(energySource) {
+                let actionResult;
+                
                 // 根据能量源类型采取不同行动
                 if(energySource.structureType) {
                     // 从结构中提取能量
-                    if(creep.withdraw(energySource, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
-                        creep.moveTo(energySource, {visualizePathStyle: {stroke: '#ffaa00'}});
-                    }
+                    actionResult = creep.withdraw(energySource, RESOURCE_ENERGY);
+                } else if(energySource.resourceType) {
+                    // 捡起掉落的资源
+                    actionResult = creep.pickup(energySource);
                 } else {
                     // 直接采集能量源
-                    if(creep.harvest(energySource) === ERR_NOT_IN_RANGE) {
-                        creep.moveTo(energySource, {visualizePathStyle: {stroke: '#ffaa00'}});
-                    }
+                    actionResult = creep.harvest(energySource);
+                }
+                
+                // 如果需要移动到目标位置
+                if(actionResult === ERR_NOT_IN_RANGE) {
+                    creep.moveTo(energySource, {visualizePathStyle: {stroke: '#ffaa00'}});
                 }
             }
         }

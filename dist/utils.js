@@ -41,12 +41,14 @@ const utils = {
         }
 
         // 检查附近是否有掉落的资源
-        const droppedResource = creep.pos.findClosestByPath(FIND_DROPPED_RESOURCES, {
-            filter: resource => resource.resourceType === RESOURCE_ENERGY && resource.amount > 0
+        const droppedResources = creep.room.find(FIND_DROPPED_RESOURCES, {
+            filter: r => r.resourceType === RESOURCE_ENERGY && r.amount > 0
         });
-        
-        if(droppedResource) {
-            return droppedResource;
+
+        if(droppedResources.length > 0) {
+            // 按照数量排序资源
+            droppedResources.sort((a, b) => b.amount - a.amount); 
+            return droppedResources[0];;
         }
         
         // 然后检查墓碑中的能量

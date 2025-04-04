@@ -63,7 +63,7 @@ const GAME_STAGES = {
             upgrader: 3,
             builder: 2,
             repairer: 2,
-            miner: 4,
+            miner: 2,
             hauler: 3,
             defender: 2,
             wallRepairer: 1
@@ -79,7 +79,7 @@ const GAME_STAGES = {
             upgrader: 2,
             builder: 2,
             repairer: 1,
-            miner: 2,
+            miner: 3,
             hauler: 4,
             defender: 2,
             wallRepairer: 1
