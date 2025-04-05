@@ -60,7 +60,7 @@ const roleUpgrader = {
         let body = [];
         
         // 根据游戏阶段和能量调整身体部件
-        if(gameStage.level >= 4 && energy >= 800) {
+        if(gameStage.level >= 3 && energy >= 800) {
             // 高级阶段配置，大量WORK和适量CARRY和MOVE
             body = [WORK, WORK, WORK, WORK, CARRY, CARRY, MOVE, MOVE, MOVE];
         }
