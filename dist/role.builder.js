@@ -26,16 +26,28 @@ const roleBuilder = {
             // 如果没有建筑工地，尝试修理结构
             else {
                 // 找出需要修理的结构（生命值低于最大生命值的75%）
-                const structure = creep.pos.findClosestByPath(FIND_STRUCTURES, {
-                    filter: (s) => s.hits < s.hitsMax * 0.75 &&
-                                  s.structureType !== STRUCTURE_WALL &&
-                                  s.structureType !== STRUCTURE_RAMPART
-                });
+                const rampart = creep.room.find(FIND_STRUCTURES, {
+                    filter: structure => 
+                        (structure.structureType === STRUCTURE_RAMPART) && 
+                        structure.hits < structure.hitsMax * 0.75
+                }).sort((a, b) => a.hits - b.hits)[0];
+
+                const wall = creep.room.find(FIND_STRUCTURES, {
+                    filter: structure => 
+                        (structure.structureType === STRUCTURE_WALL) && 
+                        structure.hits < structure.hitsMax * 0.75
+                }).sort((a, b) => a.hits - b.hits)[0];
                 
-                if(structure) {
+                if(rampart) {
                     // 尝试修理
-                    if(creep.repair(structure) === ERR_NOT_IN_RANGE) {
-                        creep.moveTo(structure, {visualizePathStyle: {stroke: '#ffffff'}});
+                    if(creep.repair(rampart) === ERR_NOT_IN_RANGE) {
+                        creep.moveTo(rampart, {visualizePathStyle: {stroke: '#ffffff'}});
+                    }
+                }
+                else if(wall) {
+                    // 尝试修理
+                    if(creep.repair(wall) === ERR_NOT_IN_RANGE) {
+                        creep.moveTo(wall, {visualizePathStyle: {stroke: '#ffffff'}});
                     }
                 }
                 // 如果没有需要修理的结构，转为升级控制器

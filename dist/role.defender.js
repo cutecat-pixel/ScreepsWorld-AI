@@ -15,15 +15,84 @@ const roleDefender = {
         if(hostiles.length > 0) {
             // 根据威胁程度对敌人排序
             const sortedHostiles = this.sortHostilesByThreat(hostiles);
+            const target = sortedHostiles[0];
             
-            // 尝试攻击威胁最大的敌人
-            if(creep.attack(sortedHostiles[0]) === ERR_NOT_IN_RANGE) {
-                // 移动到敌人身边
-                creep.moveTo(sortedHostiles[0], {
+            // 计算与目标的距离
+            const range = creep.pos.getRangeTo(target);
+            
+            // 检查是否有HEAL部件进行自我治疗
+            if(this.countBodyParts(creep, HEAL) > 0 && creep.hits < creep.hitsMax) {
+                creep.heal(creep);
+            }
+            
+            // 检查是否有RANGED_ATTACK部件进行远程攻击
+            if(this.countBodyParts(creep, RANGED_ATTACK) > 0) {
+                // 在3格范围内使用远程攻击
+                if(range <= 3) {
+                    creep.rangedAttack(target);
+                    
+                    // 如果敌人在2格以内且有多个敌人聚集，使用远程群体攻击
+                    if(range <= 2 && hostiles.length > 1) {
+                        creep.rangedMassAttack();
+                    }
+                    
+                    // 如果距离过近，保持距离
+                    if(range <= 1) {
+                        // 尝试远离敌人
+                        const fleePath = PathFinder.search(creep.pos, {
+                            pos: target.pos,
+                            range: 3
+                        }, {
+                            flee: true,
+                            maxRooms: 1
+                        });
+                        
+                        if(!fleePath.incomplete && fleePath.path.length > 0) {
+                            creep.move(creep.pos.getDirectionTo(fleePath.path[0]));
+                            creep.say('🏹 远程!');
+                            return;
+                        }
+                    }
+                }
+            }
+            
+            // 如果有ATTACK部件且敌人在攻击范围内，进行近战攻击
+            if(this.countBodyParts(creep, ATTACK) > 0 && range <= 1) {
+                creep.attack(target);
+                creep.say('⚔️ 近战!');
+            }
+            
+            // 移动逻辑
+            // 如果有远程攻击能力，尝试保持在3格的最佳攻击距离
+            if(this.countBodyParts(creep, RANGED_ATTACK) > 0 && this.countBodyParts(creep, ATTACK) === 0) {
+                // 仅有远程攻击，保持在3格距离
+                if(range < 3) {
+                    // 离目标太近，后退
+                    const fleePath = PathFinder.search(creep.pos, {
+                        pos: target.pos,
+                        range: 3
+                    }, {
+                        flee: true,
+                        maxRooms: 1
+                    });
+                    
+                    if(!fleePath.incomplete && fleePath.path.length > 0) {
+                        creep.move(creep.pos.getDirectionTo(fleePath.path[0]));
+                    }
+                } else if(range > 3) {
+                    // 离目标太远，接近
+                    creep.moveTo(target, {
+                        visualizePathStyle: {stroke: '#ff0000'},
+                        reusePath: 0,
+                        range: 3
+                    });
+                }
+            } else {
+                // 如果有近战能力或没有远程能力，直接接近敌人
+                creep.moveTo(target, {
                     visualizePathStyle: {stroke: '#ff0000'},
-                    reusePath: 0 // 每tick重新计算路径，因为敌人会移动
+                    reusePath: 0
                 });
-                creep.say('⚔️ 攻击!');
             }
         }
         // 没有敌人时巡逻
@@ -120,9 +189,19 @@ const roleDefender = {
         let body = [];
         
         // 防御者需要攻击和移动部件，以及一些强化的身体部件
-        if(gameStage.level >= 4 && energy >= 900) {
-            // 高级阶段配置，强化的近战防御者
-            body = [TOUGH, TOUGH, ATTACK, ATTACK, ATTACK, MOVE, MOVE, MOVE, MOVE, MOVE];
+        if(gameStage.level >= 3 && energy >= 1700) {
+            // 高级阶段配置，多功能防御者（远程攻击和治疗能力）
+            body = [
+                TOUGH, TOUGH, 
+                RANGED_ATTACK, RANGED_ATTACK, 
+                RANGED_ATTACK, 
+                MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, 
+                HEAL, HEAL
+            ];
+        }
+        else if(gameStage.level >= 3 && energy >= 900) {
+            // 高级阶段配置，近战+远程防御者
+            body = [TOUGH, RANGED_ATTACK, RANGED_ATTACK, RANGED_ATTACK, MOVE, MOVE, MOVE, MOVE, MOVE, HEAL];
         }
         else if(gameStage.level >= 3 && energy >= 550) {
             // 中级阶段配置

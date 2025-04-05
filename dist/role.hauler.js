@@ -33,7 +33,28 @@ const roleHauler = {
         }
         // 如果在收集模式
         else {
-            // 优先考虑从容器、墓碑或掉落的资源中获取能量
+            // 检查是否有TOWER或者SPAWN或者EXTENSION需要能量
+            const towersOrSpawnsOrExtensions = creep.room.find(FIND_MY_STRUCTURES, {
+                filter: s => (s.structureType === STRUCTURE_TOWER || s.structureType === STRUCTURE_SPAWN || s.structureType === STRUCTURE_EXTENSION) && 
+                          s.store.getFreeCapacity(RESOURCE_ENERGY) > 0
+            });
+            
+            // 如果有TOWER或者SPAWN或者EXTENSION需要能量且有STORAGE
+            if(towersOrSpawnsOrExtensions.length > 0) {
+                const storage = creep.room.find(FIND_STRUCTURES, {
+                    filter: s => s.structureType === STRUCTURE_STORAGE && 
+                              s.store.getUsedCapacity(RESOURCE_ENERGY) > 0
+                })[0];
+                
+                if(storage) {
+                    if(creep.withdraw(storage, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                        creep.moveTo(storage, {visualizePathStyle: {stroke: '#ffaa00'}});
+                    }
+                    return; // 如果要从STORAGE取能量给TOWER，就不执行后面的逻辑
+                }
+            }
+            
+            // 原有逻辑：优先考虑从容器、墓碑或掉落的资源中获取能量
             let source = null;
             
             // 查找装满能量的容器

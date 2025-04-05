@@ -145,7 +145,47 @@ function getCurrentStage() {
         // 创建一个新对象以避免修改原始常量
         currentStage = Object.assign({}, currentStage);
         currentStage.creepCounts = Object.assign({}, currentStage.creepCounts);
-        currentStage.creepCounts.defender += 2; // 增加防御者数量
+        
+        // 判断是否有塔且塔能量充足
+        let needExtraDefenders = false;
+        
+        // 如果处于中期或以上阶段，检查塔的能量
+        if(currentStage.level >= 3) {
+            for(let roomName in Memory.roomData) {
+                if(Memory.roomData[roomName].underAttack) {
+                    const room = Game.rooms[roomName];
+                    if(room && room.controller && room.controller.level > 3) {
+                        const towers = room.find(FIND_MY_STRUCTURES, {
+                            filter: s => s.structureType === STRUCTURE_TOWER
+                        });
+                        
+                        // 检查塔的能量状况
+                        if(towers.length === 0) {
+                            // 如果没有塔，需要额外的防御者
+                            needExtraDefenders = true;
+                        } else {
+                            // 检查所有塔的能量状况
+                            for(const tower of towers) {
+                                if(tower.store[RESOURCE_ENERGY] < tower.store.getCapacity(RESOURCE_ENERGY) * 0.1) {
+                                    needExtraDefenders = true;
+                                    break;
+                                }
+                            }
+                        }
+                    } else {
+                        // 控制器等级低于或等于3的房间被攻击时始终需要额外防御者
+                        needExtraDefenders = true;
+                    }
+                }
+            }
+        } else {
+            // 早期阶段始终需要额外防御者
+            needExtraDefenders = true;
+        }
+        
+        if(needExtraDefenders) {
+            currentStage.creepCounts.defender += 1; // 额外增加1个防御者
+        }
     }
     
     return currentStage;
@@ -175,9 +215,40 @@ function getCreepCountsByRole(room, gameStage) {
         targetCounts.builder = Math.max(1, targetCounts.builder - 1);
     }
     
-    // 3. 如果受到攻击，增加防御者
+    // 3. 处理防御者的生成逻辑
     if(isUnderAttack) {
-        targetCounts.defender += 2;
+        // 如果房间正在被攻击
+        if(room.controller.level > 3) {
+            // 如果控制器等级大于3级，检查塔的能量情况
+            const towers = room.find(FIND_MY_STRUCTURES, {
+                filter: s => s.structureType === STRUCTURE_TOWER
+            });
+            
+            // 只有在没有足够能量的塔时才生成额外防御者
+            let needExtraDefenders = false;
+            
+            if(towers.length === 0) {
+                // 如果没有塔，需要额外防御者
+                needExtraDefenders = true;
+            } else {
+                // 检查所有塔的能量状况
+                for(const tower of towers) {
+                    // 如果任何一个塔的能量低于10%，才需要额外防御者
+                    if(tower.store[RESOURCE_ENERGY] < tower.store.getCapacity(RESOURCE_ENERGY) * 0.1) {
+                        needExtraDefenders = true;
+                        break;
+                    }
+                }
+            }
+            
+            // 默认维持1个防御者，如果需要额外防御者，再增加1个
+            if(needExtraDefenders) {
+                targetCounts.defender += 1;
+            }
+        } else {
+            // 控制器等级低于或等于3级，增加防御者
+            targetCounts.defender += 2;
+        }
     }
     
     return targetCounts;

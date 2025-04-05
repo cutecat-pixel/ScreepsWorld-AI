@@ -64,9 +64,9 @@ const roleUpgrader = {
             // 高级阶段配置，大量WORK和适量CARRY和MOVE
             body = [WORK, WORK, WORK, WORK, CARRY, CARRY, MOVE, MOVE, MOVE];
         }
-        else if(gameStage.level >= 3 && energy >= 550) {
+        else if(gameStage.level >= 3 && energy >= 700) {
             // 中级阶段配置
-            body = [WORK, WORK, WORK, CARRY, MOVE, MOVE];
+            body = [WORK, WORK, WORK, CARRY, CARRY, MOVE, MOVE];
         }
         else if(energy >= 400) {
             // 基础配置

@@ -39,6 +39,15 @@ const utils = {
             return container;
         }
 
+        const storage = creep.pos.findClosestByPath(FIND_STRUCTURES, {
+            filter: s => s.structureType === STRUCTURE_STORAGE && 
+                        s.store[RESOURCE_ENERGY] > 0
+        });
+
+        if(storage) {
+            return storage;
+        }
+        
         // 检查附近是否有掉落的资源
         const droppedResources = creep.room.find(FIND_DROPPED_RESOURCES, {
             filter: r => r.resourceType === RESOURCE_ENERGY && r.amount > 0
@@ -50,14 +59,7 @@ const utils = {
             return droppedResources[0];;
         }
 
-        const storage = creep.pos.findClosestByPath(FIND_STRUCTURES, {
-            filter: s => s.structureType === STRUCTURE_STORAGE && 
-                        s.store[RESOURCE_ENERGY] > 0
-        });
-
-        if(storage) {
-            return storage;
-        }
+        
         
         // 然后检查墓碑中的能量
         const tombstone = creep.pos.findClosestByPath(FIND_TOMBSTONES, {
