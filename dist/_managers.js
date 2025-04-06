@@ -5,4 +5,5 @@ module.exports = {
     creep: require('manager.creep'),
     tower: require('manager.tower'),
     invasion: require('manager.invasion'),
+    link: require('manager.link'),
 }; 

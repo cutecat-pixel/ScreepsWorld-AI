@@ -235,7 +235,7 @@ const creepManager = {
      */
     getCreepPriorityOrder: function(room, gameStage) {
         // 基本优先级顺序
-        let priorityOrder = ['harvester', 'upgrader', 'builder', 'repairer', 'miner', 'hauler', 'defender', 'wallRepairer', 'claimer', 'dismantler', 'remoteMiner', 'remoteHauler'];
+        let priorityOrder = ['harvester', 'upgrader', 'builder', 'repairer', 'miner', 'hauler', 'defender', 'wallRepairer', 'claimer', 'dismantler', 'remoteMiner', 'remoteHauler', 'transfer', 'signer'];
         
         // 紧急情况的优先级调整
         
@@ -253,9 +253,13 @@ const creepManager = {
         }
         
         // 根据游戏阶段调整优先级
-        if(gameStage.level >= 3) {
-            // 中期以上阶段，矿工和运输者的优先级提高
-            priorityOrder = ['harvester', 'miner', 'hauler', 'upgrader', 'builder', 'repairer', 'defender', 'wallRepairer', 'claimer', 'dismantler', 'remoteMiner', 'remoteHauler'];
+        if(gameStage.level >= 4) {
+            // 高级阶段，矿工、运输者和转运者的优先级提高
+            priorityOrder = ['harvester', 'miner', 'hauler', 'transfer', 'upgrader', 'builder', 'repairer', 'defender', 'wallRepairer', 'claimer', 'dismantler', 'remoteMiner', 'remoteHauler'];
+        }
+        else if(gameStage.level >= 3) {
+            // 中期阶段，矿工和运输者的优先级提高
+            priorityOrder = ['harvester', 'miner', 'hauler', 'upgrader', 'builder', 'repairer', 'defender', 'wallRepairer', 'claimer', 'dismantler', 'remoteMiner', 'remoteHauler', 'transfer'];
         }
         
         return priorityOrder;

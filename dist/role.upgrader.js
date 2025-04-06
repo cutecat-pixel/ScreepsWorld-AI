@@ -27,15 +27,17 @@ const roleUpgrader = {
             // 检查是否有控制器附近的LINK
             let controllerLink = null;
             
-            if(creep.room.controller && creep.room.controller.level >= 5 && 
-               creep.room.memory.links && creep.room.memory.links.linkIds && 
-               creep.room.memory.links.linkIds.controller) {
+            // 根据link管理器中的memory结构检查控制器附近的LINK
+            if(creep.room.controller && 
+               creep.room.controller.level >= 5 && 
+               creep.room.memory.links && 
+               creep.room.memory.links.controller) {
                 
-                controllerLink = Game.getObjectById(creep.room.memory.links.linkIds.controller);
+                controllerLink = Game.getObjectById(creep.room.memory.links.controller);
             }
             
             // 如果有控制器LINK且有能量，优先从中获取
-            if(controllerLink && controllerLink.store[RESOURCE_ENERGY] > 0) {
+            if(controllerLink && controllerLink.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
                 if(creep.withdraw(controllerLink, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
                     creep.moveTo(controllerLink, {visualizePathStyle: {stroke: '#ffaa00'}});
                 }

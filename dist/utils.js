@@ -29,25 +29,47 @@ const utils = {
      */
     findEnergySource: function(creep) {
 
-        // 检查有能量的容器和存储
-        const container = creep.pos.findClosestByPath(FIND_STRUCTURES, {
-            filter: s => (s.structureType === STRUCTURE_CONTAINER) && 
-                        s.store[RESOURCE_ENERGY] > creep.store.getFreeCapacity()
-        });
-        
-        if(container) {
-            return container;
+        if (creep.room.controller.level >= 5) {
+            const storage = creep.pos.findClosestByPath(FIND_STRUCTURES, {
+                filter: s => s.structureType === STRUCTURE_STORAGE && 
+                            s.store[RESOURCE_ENERGY] > 0
+            });
+    
+            if(storage) {
+                return storage;
+            }
+
+            // 检查有能量的容器和存储
+            const container = creep.pos.findClosestByPath(FIND_STRUCTURES, {
+                filter: s => (s.structureType === STRUCTURE_CONTAINER) && 
+                            s.store[RESOURCE_ENERGY] > creep.store.getFreeCapacity()
+            });
+            
+            if(container) {
+                return container;
+            }
+        }
+        else {
+            // 检查有能量的容器和存储
+            const container = creep.pos.findClosestByPath(FIND_STRUCTURES, {
+                filter: s => (s.structureType === STRUCTURE_CONTAINER) && 
+                            s.store[RESOURCE_ENERGY] > creep.store.getFreeCapacity()
+            });
+
+            if(container) {
+                return container;
+            }
+
+            const storage = creep.pos.findClosestByPath(FIND_STRUCTURES, {
+                filter: s => s.structureType === STRUCTURE_STORAGE && 
+                            s.store[RESOURCE_ENERGY] > 0
+            });
+    
+            if(storage) {
+                return storage;
+            }
         }
 
-        const storage = creep.pos.findClosestByPath(FIND_STRUCTURES, {
-            filter: s => s.structureType === STRUCTURE_STORAGE && 
-                        s.store[RESOURCE_ENERGY] > 0
-        });
-
-        if(storage) {
-            return storage;
-        }
-        
         // 检查附近是否有掉落的资源
         const droppedResources = creep.room.find(FIND_DROPPED_RESOURCES, {
             filter: r => r.resourceType === RESOURCE_ENERGY && r.amount > 0

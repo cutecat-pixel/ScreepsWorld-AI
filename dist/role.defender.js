@@ -8,6 +8,24 @@ const roleDefender = {
      * @param {Creep} creep - 要控制的creep对象
      */
     run: function(creep) {
+        // 检查是否有指定的目标房间
+        if(creep.memory.targetRoom && creep.room.name !== creep.memory.targetRoom) {
+            // 如果不在目标房间，移动到目标房间
+            const exitDir = Game.map.findExit(creep.room, creep.memory.targetRoom);
+            if(exitDir === ERR_NO_PATH) {
+                creep.say('❌无法到达');
+                return;
+            }
+            
+            const exit = creep.pos.findClosestByRange(exitDir);
+            creep.moveTo(exit, {
+                visualizePathStyle: {stroke: '#ffaa00'},
+                reusePath: 50
+            });
+            creep.say('🏃前往');
+            return;
+        }
+        
         // 查找房间内的敌对creeps
         const hostiles = creep.room.find(FIND_HOSTILE_CREEPS);
         
@@ -149,10 +167,11 @@ const roleDefender = {
      * @param {Creep} creep - 要巡逻的creep
      */
     patrolRoom: function(creep) {
-        // 如果没有巡逻位置或已经到达目标位置，获取新的巡逻位置
+        // 如果没有巡逻位置，或已经到达目标位置，或巡逻位置不在当前房间，获取新的巡逻位置
         if(!creep.memory.patrolPos || 
            (creep.pos.x === creep.memory.patrolPos.x && 
-            creep.pos.y === creep.memory.patrolPos.y)) {
+            creep.pos.y === creep.memory.patrolPos.y) ||
+           creep.memory.patrolPos.roomName !== creep.room.name) {
             
             // 获取房间边界内的随机位置
             const x = 10 + Math.floor(Math.random() * 30); // 避开边缘区域

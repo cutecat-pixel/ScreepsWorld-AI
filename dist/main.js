@@ -24,6 +24,38 @@ global.disableRemoteMining = function(targetRoomName) {
     return _managers.invasion.disableRemoteMining(targetRoomName);
 };
 
+// 添加房间签名辅助函数
+global.signRoom = function(spawnRoomName, targetRoomName, signText) {
+    return _roles.signer.createSignerTask(spawnRoomName, targetRoomName, signText);
+};
+
+// 添加手动生成防御者辅助函数
+global.spawnDefender = function(spawnRoomName, targetRoomName, priority = 1) {
+    // 确保有生成队列
+    if(!Memory.spawnQueue) {
+        Memory.spawnQueue = {};
+    }
+    
+    if(!Memory.spawnQueue[spawnRoomName]) {
+        Memory.spawnQueue[spawnRoomName] = [];
+    }
+    
+    // 添加到生成队列，可以指定优先级
+    Memory.spawnQueue[spawnRoomName].push({
+        role: 'defender',
+        priority: priority,
+        memory: {
+            role: 'defender',
+            homeRoom: spawnRoomName,
+            targetRoom: targetRoomName,
+            patrolAssigned: true // 标记这是手动指派的防御者
+        }
+    });
+    
+    console.log(`已添加防御任务: 从 ${spawnRoomName} 派出防御者至 ${targetRoomName}`);
+    return `防御任务已添加到队列，defender将在下次生成周期被创建`;
+};
+
 /**
  * Screeps主逻辑入口
  * 每tick会自动调用这个函数
@@ -46,6 +78,9 @@ module.exports.loop = function() {
             
             // 处理房间中的防御塔
             _managers.tower.manageTowers(room);
+            
+            // 管理LINK能量传输
+            _managers.link.manageLinks(room);
             
             // 管理该房间的creep生成
             _managers.creep.manageCreeps(room, gameStage);

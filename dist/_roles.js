@@ -11,5 +11,7 @@ module.exports = {
     dismantler: require('role.dismantler'),
     wallRepairer: require('role.wallRepairer'),
     remoteMiner: require('role.remoteMiner'),
-    remoteHauler: require('role.remoteHauler')
+    remoteHauler: require('role.remoteHauler'),
+    transfer: require('role.transfer'),
+    signer: require('role.signer')
 }; 

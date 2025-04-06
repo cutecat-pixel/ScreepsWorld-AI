@@ -18,7 +18,8 @@ const GAME_STAGES = {
             miner: 0,
             hauler: 0,
             defender: 0,
-            wallRepairer: 0
+            wallRepairer: 0,
+            transfer: 0
         }
     },
     
@@ -34,7 +35,8 @@ const GAME_STAGES = {
             miner: 0,
             hauler: 0,
             defender: 1,
-            wallRepairer: 0
+            wallRepairer: 0,
+            transfer: 0
         }
     },
     
@@ -50,7 +52,8 @@ const GAME_STAGES = {
             miner: 2,
             hauler: 2,
             defender: 1,
-            wallRepairer: 1
+            wallRepairer: 1,
+            transfer: 0
         }
     },
     
@@ -62,11 +65,12 @@ const GAME_STAGES = {
             harvester: 0,
             upgrader: 3,
             builder: 2,
-            repairer: 2,
+            repairer: 1,
             miner: 2,
             hauler: 2,
             defender: 1,
-            wallRepairer: 1
+            wallRepairer: 1,
+            transfer: 1
         }
     },
     
@@ -82,7 +86,8 @@ const GAME_STAGES = {
             miner: 3,
             hauler: 2,
             defender: 1,
-            wallRepairer: 1
+            wallRepairer: 1,
+            transfer: 2
         }
     }
 };
