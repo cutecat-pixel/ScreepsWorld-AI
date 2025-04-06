@@ -83,7 +83,7 @@ const roleHauler = {
             }).length > 0;
             
             // 如果有建筑需要能量且STORAGE有能量，优先从STORAGE获取
-            if(energyNeeded) {
+            if(energyNeeded || (creep.room.memory.links && creep.room.memory.links.storage && Game.getObjectById(creep.room.memory.links.storage).store.getFreeCapacity(RESOURCE_ENERGY) > 0)) {
                 const storage = creep.room.find(FIND_STRUCTURES, {
                     filter: s => s.structureType === STRUCTURE_STORAGE && 
                               s.store.getUsedCapacity(RESOURCE_ENERGY) > 0

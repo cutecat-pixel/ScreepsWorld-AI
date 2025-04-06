@@ -78,7 +78,7 @@ const linkManager = {
         
         // 如果控制器旁的LINK能量不足，且STORAGE旁的LINK能量充足，传输能量
         if(controllerLink.store.getUsedCapacity(RESOURCE_ENERGY) < 200 && 
-           storageLink.store.getUsedCapacity(RESOURCE_ENERGY) >= 800 && 
+           storageLink.store.getUsedCapacity(RESOURCE_ENERGY) >= 600 && 
            !storageLink.cooldown) {
             storageLink.transferEnergy(controllerLink);
         }

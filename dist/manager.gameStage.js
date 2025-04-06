@@ -68,7 +68,7 @@ const GAME_STAGES = {
             repairer: 1,
             miner: 2,
             hauler: 2,
-            defender: 1,
+            defender: 0,
             wallRepairer: 1,
             transfer: 1
         }
