@@ -25,35 +25,48 @@ const roleBuilder = {
             }
             // 如果没有建筑工地，尝试修理结构
             else {
-                // 找出需要修理的结构（生命值低于最大生命值的75%）
-                const rampart = creep.room.find(FIND_STRUCTURES, {
+                const road = creep.room.find(FIND_STRUCTURES, {
                     filter: structure => 
-                        (structure.structureType === STRUCTURE_RAMPART) && 
-                        structure.hits < structure.hitsMax * 0.75
-                }).sort((a, b) => a.hits - b.hits)[0];
-
-                const wall = creep.room.find(FIND_STRUCTURES, {
-                    filter: structure => 
-                        (structure.structureType === STRUCTURE_WALL) && 
-                        structure.hits < structure.hitsMax * 0.75
+                        (structure.structureType === STRUCTURE_ROAD || structure.structureType === STRUCTURE_CONTAINER) && 
+                        structure.hits < structure.hitsMax * 0.9
                 }).sort((a, b) => a.hits - b.hits)[0];
                 
-                if(rampart) {
-                    // 尝试修理
-                    if(creep.repair(rampart) === ERR_NOT_IN_RANGE) {
-                        creep.moveTo(rampart, {visualizePathStyle: {stroke: '#ffffff'}});
+                if(road) {
+                    if(creep.repair(road) === ERR_NOT_IN_RANGE) {
+                        creep.moveTo(road, {visualizePathStyle: {stroke: '#ffffff'}});
                     }
                 }
-                else if(wall) {
-                    // 尝试修理
-                    if(creep.repair(wall) === ERR_NOT_IN_RANGE) {
-                        creep.moveTo(wall, {visualizePathStyle: {stroke: '#ffffff'}});
-                    }
-                }
-                // 如果没有需要修理的结构，转为升级控制器
                 else {
-                    if(creep.upgradeController(creep.room.controller) === ERR_NOT_IN_RANGE) {
-                        creep.moveTo(creep.room.controller, {visualizePathStyle: {stroke: '#ffffff'}});
+                    // 找出需要修理的结构（生命值低于最大生命值的75%）
+                    const rampart = creep.room.find(FIND_STRUCTURES, {
+                        filter: structure => 
+                            (structure.structureType === STRUCTURE_RAMPART) && 
+                            structure.hits < structure.hitsMax * 0.75
+                    }).sort((a, b) => a.hits - b.hits)[0];
+
+                    const wall = creep.room.find(FIND_STRUCTURES, {
+                        filter: structure => 
+                            (structure.structureType === STRUCTURE_WALL) && 
+                            structure.hits < structure.hitsMax * 0.75
+                    }).sort((a, b) => a.hits - b.hits)[0];
+                    
+                    if(rampart) {
+                        // 尝试修理
+                        if(creep.repair(rampart) === ERR_NOT_IN_RANGE) {
+                            creep.moveTo(rampart, {visualizePathStyle: {stroke: '#ffffff'}});
+                        }
+                    }
+                    else if(wall) {
+                        // 尝试修理
+                        if(creep.repair(wall) === ERR_NOT_IN_RANGE) {
+                            creep.moveTo(wall, {visualizePathStyle: {stroke: '#ffffff'}});
+                        }
+                    }
+                    // 如果没有需要修理的结构，转为升级控制器
+                    else {
+                        if(creep.upgradeController(creep.room.controller) === ERR_NOT_IN_RANGE) {
+                            creep.moveTo(creep.room.controller, {visualizePathStyle: {stroke: '#ffffff'}});
+                        }
                     }
                 }
             }

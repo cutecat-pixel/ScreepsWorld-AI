@@ -24,7 +24,25 @@ const roleUpgrader = {
         }
         // 如果在采集模式
         else {
-            // 尝试从容器或储藏获取能量，或者直接从源头采集
+            // 检查是否有控制器附近的LINK
+            let controllerLink = null;
+            
+            if(creep.room.controller && creep.room.controller.level >= 5 && 
+               creep.room.memory.links && creep.room.memory.links.linkIds && 
+               creep.room.memory.links.linkIds.controller) {
+                
+                controllerLink = Game.getObjectById(creep.room.memory.links.linkIds.controller);
+            }
+            
+            // 如果有控制器LINK且有能量，优先从中获取
+            if(controllerLink && controllerLink.store[RESOURCE_ENERGY] > 0) {
+                if(creep.withdraw(controllerLink, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                    creep.moveTo(controllerLink, {visualizePathStyle: {stroke: '#ffaa00'}});
+                }
+                return;
+            }
+            
+            // 如果没有控制器LINK或其能量为0，使用标准能量获取逻辑
             const energySource = utils.findEnergySource(creep);
             
             if(energySource) {
@@ -60,7 +78,12 @@ const roleUpgrader = {
         let body = [];
         
         // 根据游戏阶段和能量调整身体部件
-        if(gameStage.level >= 3 && energy >= 800) {
+        if(gameStage.level >= 5 && energy >= 1200) {
+            // 后期阶段配置，大量WORK用于高效升级
+            body = [WORK, WORK, WORK, WORK, WORK, WORK, WORK, WORK,
+                   CARRY, CARRY, MOVE, MOVE, MOVE, MOVE];
+        }
+        else if(gameStage.level >= 3 && energy >= 800) {
             // 高级阶段配置，大量WORK和适量CARRY和MOVE
             body = [WORK, WORK, WORK, WORK, CARRY, CARRY, MOVE, MOVE, MOVE];
         }

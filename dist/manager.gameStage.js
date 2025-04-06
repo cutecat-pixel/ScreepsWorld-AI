@@ -64,8 +64,8 @@ const GAME_STAGES = {
             builder: 2,
             repairer: 2,
             miner: 2,
-            hauler: 3,
-            defender: 2,
+            hauler: 2,
+            defender: 1,
             wallRepairer: 1
         }
     },
@@ -80,8 +80,8 @@ const GAME_STAGES = {
             builder: 2,
             repairer: 1,
             miner: 3,
-            hauler: 4,
-            defender: 2,
+            hauler: 2,
+            defender: 1,
             wallRepairer: 1
         }
     }

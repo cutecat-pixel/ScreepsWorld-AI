@@ -130,7 +130,14 @@ const roleHauler = {
         let body = [];
         
         // 运输者主要需要CARRY和MOVE部件
-        if(gameStage.level >= 4 && energy >= 800) {
+        if(gameStage.level >= 5 && energy >= 1800) {
+            // 后期阶段配置，更大容量
+            body = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY,
+                   CARRY, CARRY, CARRY, CARRY, CARRY,
+                   MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE,
+                   MOVE, MOVE, MOVE, MOVE, MOVE];
+        }
+        else if(gameStage.level >= 4 && energy >= 800) {
             // 高级阶段配置，大量CARRY和匹配的MOVE
             body = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, 
                    MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE];
