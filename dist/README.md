@@ -87,5 +87,10 @@ global.enableRemoteMining('W5N8', 2, 3);
 // 查看入侵状态
 global.getInvasionStatus();
 ```
-
-祝您使用愉快！ 
+# 手动远程派遣Defender
+```javascript
+spawnDefender('出生房间名', '目标房间名', 优先级);
+```
+1.第一个参数：creep的出生房间名（您控制的房间）
+2.第二个参数：您希望defender前往的目标房间
+3.第三个参数：生成优先级（可选，默认为1，数字越小优先级越高）
