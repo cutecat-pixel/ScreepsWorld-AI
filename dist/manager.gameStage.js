@@ -70,7 +70,7 @@ const GAME_STAGES = {
             hauler: 2,
             defender: 0,
             wallRepairer: 1,
-            transfer: 1
+            transfer: 2
         }
     },
     
