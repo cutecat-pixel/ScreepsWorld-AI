@@ -93,93 +93,74 @@ const GAME_STAGES = {
 };
 
 /**
- * 计算当前游戏阶段
+ * 计算指定房间的游戏阶段
+ * @param {Room} room - 要计算阶段的房间对象
  * @returns {Object} 游戏阶段对象
  */
-function getCurrentStage() {
+function getRoomStage(room) {
     // 初始化默认为EARLY阶段
-    let currentStage = GAME_STAGES.EARLY;
+    let roomStage = GAME_STAGES.EARLY;
     
-    // 遍历所有房间
-    for(let name in Game.rooms) {
-        const room = Game.rooms[name];
-        
-        // 只检查我们控制的房间
-        if(!room.controller || !room.controller.my) continue;
-        
-        // 基于控制器等级初步判断
-        let roomStage;
-        if(room.controller.level >= 7) {
-            roomStage = GAME_STAGES.LATE;
-        } 
-        else if(room.controller.level >= 5) {
-            roomStage = GAME_STAGES.ADVANCED;
-        }
-        else if(room.controller.level >= 3) {
-            // 中期阶段判断更复杂，需要检查一些关键结构
-            const containers = room.find(FIND_STRUCTURES, {
-                filter: s => s.structureType === STRUCTURE_CONTAINER
-            }).length;
-            
-            const towers = room.find(FIND_MY_STRUCTURES, {
-                filter: s => s.structureType === STRUCTURE_TOWER
-            }).length;
-            
-            if(containers >= 2 && towers >= 1) {
-                roomStage = GAME_STAGES.MIDGAME;
-            } else {
-                roomStage = GAME_STAGES.DEVELOPING;
-            }
-        }
-        else if(room.controller.level >= 2) {
-            roomStage = GAME_STAGES.DEVELOPING;
-        }
-        else {
-            roomStage = GAME_STAGES.EARLY;
-        }
-        
-        // 如果这个房间的阶段比当前计算的高，更新当前阶段
-        if(roomStage.level > currentStage.level) {
-            currentStage = roomStage;
-        }
+    // 检查房间是否存在及是否被我们控制
+    if(!room || !room.controller || !room.controller.my) {
+        return roomStage;
     }
     
-    // 检查是否受到攻击，如果是，增加防御者需求
-    const roomsUnderAttack = _.filter(Memory.roomData || {}, data => data.underAttack);
-    if(roomsUnderAttack.length > 0) {
+    // 基于控制器等级初步判断
+    if(room.controller.level >= 7) {
+        roomStage = GAME_STAGES.LATE;
+    } 
+    else if(room.controller.level >= 5) {
+        roomStage = GAME_STAGES.ADVANCED;
+    }
+    else if(room.controller.level >= 3) {
+        // 中期阶段判断更复杂，需要检查一些关键结构
+        const containers = room.find(FIND_STRUCTURES, {
+            filter: s => s.structureType === STRUCTURE_CONTAINER
+        }).length;
+        
+        const towers = room.find(FIND_MY_STRUCTURES, {
+            filter: s => s.structureType === STRUCTURE_TOWER
+        }).length;
+        
+        if(containers >= 2 && towers >= 1) {
+            roomStage = GAME_STAGES.MIDGAME;
+        } else {
+            roomStage = GAME_STAGES.DEVELOPING;
+        }
+    }
+    else if(room.controller.level >= 2) {
+        roomStage = GAME_STAGES.DEVELOPING;
+    }
+    else {
+        roomStage = GAME_STAGES.EARLY;
+    }
+    
+    // 检查该房间是否受到攻击，如果是，调整防御者需求
+    if(Memory.roomData && Memory.roomData[room.name] && Memory.roomData[room.name].underAttack) {
         // 创建一个新对象以避免修改原始常量
-        currentStage = Object.assign({}, currentStage);
-        currentStage.creepCounts = Object.assign({}, currentStage.creepCounts);
+        roomStage = Object.assign({}, roomStage);
+        roomStage.creepCounts = Object.assign({}, roomStage.creepCounts);
         
         // 判断是否有塔且塔能量充足
         let needExtraDefenders = false;
         
         // 如果处于中期或以上阶段，检查塔的能量
-        if(currentStage.level >= 3) {
-            for(let roomName in Memory.roomData) {
-                if(Memory.roomData[roomName].underAttack) {
-                    const room = Game.rooms[roomName];
-                    if(room && room.controller && room.controller.level > 3) {
-                        const towers = room.find(FIND_MY_STRUCTURES, {
-                            filter: s => s.structureType === STRUCTURE_TOWER
-                        });
-                        
-                        // 检查塔的能量状况
-                        if(towers.length === 0) {
-                            // 如果没有塔，需要额外的防御者
-                            needExtraDefenders = true;
-                        } else {
-                            // 检查所有塔的能量状况
-                            for(const tower of towers) {
-                                if(tower.store[RESOURCE_ENERGY] < tower.store.getCapacity(RESOURCE_ENERGY) * 0.1) {
-                                    needExtraDefenders = true;
-                                    break;
-                                }
-                            }
-                        }
-                    } else {
-                        // 控制器等级低于或等于3的房间被攻击时始终需要额外防御者
+        if(roomStage.level >= 3) {
+            const towers = room.find(FIND_MY_STRUCTURES, {
+                filter: s => s.structureType === STRUCTURE_TOWER
+            });
+            
+            // 检查塔的能量状况
+            if(towers.length === 0) {
+                // 如果没有塔，需要额外的防御者
+                needExtraDefenders = true;
+            } else {
+                // 检查所有塔的能量状况
+                for(const tower of towers) {
+                    if(tower.store[RESOURCE_ENERGY] < tower.store.getCapacity(RESOURCE_ENERGY) * 0.1) {
                         needExtraDefenders = true;
+                        break;
                     }
                 }
             }
@@ -189,7 +170,40 @@ function getCurrentStage() {
         }
         
         if(needExtraDefenders) {
-            currentStage.creepCounts.defender += 1; // 额外增加1个防御者
+            roomStage.creepCounts.defender += 1; // 额外增加1个防御者
+        }
+    }
+    
+    return roomStage;
+}
+
+/**
+ * 计算当前游戏阶段
+ * @param {Room} [room] - 可选的房间对象参数，如果提供则返回该房间的阶段
+ * @returns {Object} 游戏阶段对象
+ */
+function getCurrentStage(room) {
+    // 如果提供了特定房间，返回该房间的阶段
+    if(room) {
+        return getRoomStage(room);
+    }
+    
+    // 向后兼容：如果没有提供房间，返回所有房间中的最高阶段
+    let currentStage = GAME_STAGES.EARLY;
+    
+    // 遍历所有房间
+    for(let name in Game.rooms) {
+        const room = Game.rooms[name];
+        
+        // 只检查我们控制的房间
+        if(!room.controller || !room.controller.my) continue;
+        
+        // 获取该房间的阶段
+        const roomStage = getRoomStage(room);
+        
+        // 如果这个房间的阶段比当前计算的高，更新当前阶段
+        if(roomStage.level > currentStage.level) {
+            currentStage = roomStage;
         }
     }
     
@@ -251,8 +265,8 @@ function getCreepCountsByRole(room, gameStage) {
                 targetCounts.defender += 1;
             }
         } else {
-            // 控制器等级低于或等于3级，增加防御者
-            targetCounts.defender += 2;
+            // 低等级房间直接增加防御者
+            targetCounts.defender += 1;
         }
     }
     

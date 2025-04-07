@@ -1,6 +1,7 @@
 // 导入各个模块
 const _managers = require('_managers');
 const _roles = require('_roles');
+const linkManager = require('manager.link');
 
 // 添加全局入侵辅助函数
 global.invade = function(sourceRoomName, targetRoomName, options = {}) {
@@ -56,6 +57,49 @@ global.spawnDefender = function(spawnRoomName, targetRoomName, priority = 1) {
     return `防御任务已添加到队列，defender将在下次生成周期被创建`;
 };
 
+// 添加远程建造者辅助函数
+global.spawnRemoteBuilder = function(spawnRoomName, targetRoomName, count = 2, priority = 2) {
+    return _roles.remoteBuilder.createRemoteBuilderTask(spawnRoomName, targetRoomName, count, priority);
+};
+
+// 修改远程建造者数量
+global.updateRemoteBuilders = function(targetRoomName, count) {
+    if(!Memory.remoteBuilders) {
+        Memory.remoteBuilders = {};
+    }
+    
+    if(!Memory.remoteBuilders[targetRoomName]) {
+        console.log(`错误：${targetRoomName} 没有远程建造任务配置`);
+        return `没有找到 ${targetRoomName} 的远程建造任务`;
+    }
+    
+    Memory.remoteBuilders[targetRoomName].count = count;
+    console.log(`已更新 ${targetRoomName} 的远程建造者数量为 ${count}`);
+    
+    // 找到可用的出生房间
+    const possibleSpawnRooms = _.filter(Game.rooms, room => 
+        room.controller && room.controller.my && room.find(FIND_MY_SPAWNS).length > 0
+    );
+    
+    if(possibleSpawnRooms.length > 0) {
+        _roles.remoteBuilder.createRemoteBuilderTask(possibleSpawnRooms[0].name, targetRoomName, count, 2);
+    }
+    
+    return `远程建造者数量已更新为 ${count}`;
+};
+
+// 取消远程建造任务
+global.cancelRemoteBuilders = function(targetRoomName) {
+    if(!Memory.remoteBuilders || !Memory.remoteBuilders[targetRoomName]) {
+        return `没有找到 ${targetRoomName} 的远程建造任务`;
+    }
+    
+    delete Memory.remoteBuilders[targetRoomName];
+    console.log(`已取消 ${targetRoomName} 的远程建造任务`);
+    
+    return `远程建造任务已取消`;
+};
+
 /**
  * Screeps主逻辑入口
  * 每tick会自动调用这个函数
@@ -67,14 +111,17 @@ module.exports.loop = function() {
     // 处理入侵任务
     _managers.invasion.processInvasions();
     
+    // 维护远程建造者数量
+    _roles.remoteBuilder.maintainRemoteBuilders();
+    
     // 遍历所有房间
     for(const roomName in Game.rooms) {
         const room = Game.rooms[roomName];
         
         // 确保只针对我们控制的房间运行代码
         if(room.controller && room.controller.my) {
-            // 获取当前游戏阶段
-            const gameStage = _managers.gameStage.getCurrentStage();
+            // 获取当前房间的游戏阶段
+            const gameStage = _managers.gameStage.getCurrentStage(room);
             
             // 处理房间中的防御塔
             _managers.tower.manageTowers(room);

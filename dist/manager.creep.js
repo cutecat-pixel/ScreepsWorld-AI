@@ -235,7 +235,7 @@ const creepManager = {
      */
     getCreepPriorityOrder: function(room, gameStage) {
         // 基本优先级顺序
-        let priorityOrder = ['harvester', 'upgrader', 'builder', 'repairer', 'miner', 'hauler', 'defender', 'wallRepairer', 'claimer', 'dismantler', 'remoteMiner', 'remoteHauler', 'transfer', 'signer'];
+        let priorityOrder = ['harvester', 'upgrader', 'builder', 'repairer', 'miner', 'hauler', 'defender', 'wallRepairer', 'claimer', 'dismantler', 'remoteMiner', 'remoteHauler', 'transfer', 'signer', 'remoteBuilder'];
         
         // 紧急情况的优先级调整
         

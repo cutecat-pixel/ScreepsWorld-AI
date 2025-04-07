@@ -190,12 +190,7 @@ const roleRemoteMiner = {
     getBody: function(energy, gameStage) {
         let body = [];
         
-        // 远程矿工需要WORK部件、少量CARRY和足够的MOVE部件
-        if(gameStage.level >= 4 && energy >= 800) {
-            // 高级阶段配置
-            body = [WORK, WORK, WORK, WORK, WORK, WORK, WORK, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE];
-        }
-        else if(gameStage.level >= 3 && energy >= 500) {
+        if(gameStage.level >= 3 && energy >= 500) {
             // 中级阶段配置
             body = [WORK, WORK, WORK, WORK, MOVE, MOVE, MOVE, MOVE];
         }

@@ -234,13 +234,7 @@ const roleRemoteHauler = {
     getBody: function(energy, gameStage) {
         let body = [];
         
-        // 远程运输者需要更多的CARRY和匹配的MOVE部件
-        if(gameStage.level >= 4 && energy >= 1000) {
-            // 高级阶段配置，大量CARRY和匹配的MOVE
-            body = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY,
-                   MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE];
-        }
-        else if(gameStage.level >= 3 && energy >= 600) {
+        if(gameStage.level >= 3 && energy >= 600) {
             // 中级阶段配置
             body = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY,
                    MOVE, MOVE, MOVE, MOVE, MOVE, MOVE];
