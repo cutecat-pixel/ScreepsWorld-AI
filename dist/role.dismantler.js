@@ -44,7 +44,7 @@ const dismantlerRole = {
             const exitDir = Game.map.findExit(creep.room, creep.memory.targetRoom);
             const exit = creep.pos.findClosestByRange(exitDir);
             creep.moveTo(exit, {visualizePathStyle: {stroke: '#ff0000'}});
-            creep.say('前往');
+            creep.say('🚶');
             return;
         }
         
@@ -97,7 +97,7 @@ const dismantlerRole = {
         if(target) {
             if(creep.dismantle(target) === ERR_NOT_IN_RANGE) {
                 creep.moveTo(target, {visualizePathStyle: {stroke: '#ff0000'}});
-                creep.say('拆除');
+                creep.say('🔨');
             }
         } else {
             // 如果没有目标，在房间中心游荡
@@ -105,7 +105,7 @@ const dismantlerRole = {
                 visualizePathStyle: {stroke: '#ffff00'},
                 range: 10
             });
-            creep.say('搜索');
+            creep.say('🔍');
         }
     },
     

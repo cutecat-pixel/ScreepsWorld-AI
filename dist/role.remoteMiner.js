@@ -13,7 +13,7 @@ const roleRemoteMiner = {
             const exitDir = Game.map.findExit(creep.room, creep.memory.targetRoom);
             const exit = creep.pos.findClosestByRange(exitDir);
             creep.moveTo(exit, {visualizePathStyle: {stroke: '#ffaa00'}});
-            creep.say('前往');
+            creep.say('🚶');
             return;
         }
         
@@ -87,7 +87,7 @@ const roleRemoteMiner = {
         // 分配找到的能量源
         if(targetSource) {
             creep.memory.sourceId = targetSource;
-            creep.say('⛏️ 分配源');
+            creep.say('⛏️');
         } else {
             // 如果所有能量源都已达到容量上限，选择矿工最少的能量源
             let minMiners = Infinity;
@@ -99,7 +99,7 @@ const roleRemoteMiner = {
             }
             if(targetSource) {
                 creep.memory.sourceId = targetSource;
-                creep.say('⛏️ 共享源');
+                creep.say('⛏️');
             }
         }
     },

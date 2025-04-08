@@ -31,7 +31,7 @@ const claimerRole = {
             const exitDir = Game.map.findExit(creep.room, creep.memory.targetRoom);
             const exit = creep.pos.findClosestByRange(exitDir);
             creep.moveTo(exit, {visualizePathStyle: {stroke: '#ffaa00'}});
-            creep.say('前往');
+            creep.say('🚶');
             return;
         }
         
@@ -60,11 +60,11 @@ const claimerRole = {
                 
                 // 根据行动模式显示不同的表情
                 if(creep.memory.mode === 'attack') {
-                    creep.say('攻击');
+                    creep.say('⚔️');
                 } else if(creep.memory.mode === 'reserve') {
-                    creep.say('预定');
+                    creep.say('🔖');
                 } else {
-                    creep.say('占领');
+                    creep.say('🏁');
                 }
             } else if(actionResult === ERR_GCL_NOT_ENOUGH) {
                 // 如果GCL不足，切换到预定模式

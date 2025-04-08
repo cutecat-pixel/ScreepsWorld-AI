@@ -11,12 +11,12 @@ const roleRemoteBuilder = {
         // 如果creep正在工作但没有能量了，切换状态为获取能量
         if(creep.memory.building && creep.store[RESOURCE_ENERGY] === 0) {
             creep.memory.building = false;
-            creep.say('🔄 采集');
+            creep.say('🔄');
         }
         // 如果creep不在工作状态但能量已满，切换状态为建造
         if(!creep.memory.building && creep.store.getFreeCapacity() === 0) {
             creep.memory.building = true;
-            creep.say('🚧 建造');
+            creep.say('🚧');
         }
         
         // 检查是否有指定的目标房间
@@ -24,7 +24,7 @@ const roleRemoteBuilder = {
             // 如果不在目标房间，移动到目标房间
             const exitDir = Game.map.findExit(creep.room, creep.memory.targetRoom);
             if(exitDir === ERR_NO_PATH) {
-                creep.say('❌无法到达');
+                creep.say('❌');
                 return;
             }
             
@@ -33,7 +33,7 @@ const roleRemoteBuilder = {
                 visualizePathStyle: {stroke: '#ffaa00'},
                 reusePath: 50
             });
-            creep.say('🏃前往');
+            creep.say('🏃');
             return;
         }
         
@@ -54,7 +54,7 @@ const roleRemoteBuilder = {
                         visualizePathStyle: {stroke: '#ffffff'},
                         reusePath: 5
                     });
-                    creep.say('🚧 建造');
+                    creep.say('🚧');
                 }
             } else {
                 // 如果没有建筑工地，可以选择修复建筑
@@ -73,12 +73,12 @@ const roleRemoteBuilder = {
                             visualizePathStyle: {stroke: '#ffff00'},
                             reusePath: 5
                         });
-                        creep.say('🔧 修复');
+                        creep.say('🔧');
                     }
                 } else {
                     // 没有任何建造或修复任务，随机移动避免堵塞
                     if(Game.time % 10 === 0) { 
-                        creep.say('🔍 待命');
+                        creep.say('🔍');
                         creep.moveTo(25 + Math.floor(Math.random() * 10), 25 + Math.floor(Math.random() * 10), {
                             visualizePathStyle: {stroke: '#ffffff'}
                         });
@@ -99,7 +99,7 @@ const roleRemoteBuilder = {
                             visualizePathStyle: {stroke: '#ffaa00'},
                             reusePath: 5
                         });
-                        creep.say('📥 拾取');
+                        creep.say('📥');
                     }
                 } else if(source.structureType && source.store) {
                     // 从容器或存储中获取能量
@@ -108,7 +108,7 @@ const roleRemoteBuilder = {
                             visualizePathStyle: {stroke: '#ffaa00'},
                             reusePath: 5
                         });
-                        creep.say('📥 取出');
+                        creep.say('📥');
                     }
                 } else {
                     // 直接从矿点采集
@@ -117,11 +117,11 @@ const roleRemoteBuilder = {
                             visualizePathStyle: {stroke: '#ffaa00'},
                             reusePath: 5
                         });
-                        creep.say('⛏️ 采集');
+                        creep.say('⛏️');
                     }
                 }
             } else {
-                creep.say('❌ 无能源');
+                creep.say('❌');
                 // 没有能源可用，随机移动避免堵塞
                 creep.moveTo(25 + Math.floor(Math.random() * 10), 25 + Math.floor(Math.random() * 10), {
                     visualizePathStyle: {stroke: '#ffffff'}

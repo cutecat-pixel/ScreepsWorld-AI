@@ -13,7 +13,7 @@ const roleDefender = {
             // 如果不在目标房间，移动到目标房间
             const exitDir = Game.map.findExit(creep.room, creep.memory.targetRoom);
             if(exitDir === ERR_NO_PATH) {
-                creep.say('❌无法到达');
+                creep.say('❌');
                 return;
             }
             
@@ -22,7 +22,7 @@ const roleDefender = {
                 visualizePathStyle: {stroke: '#ffaa00'},
                 reusePath: 50
             });
-            creep.say('🏃前往');
+            creep.say('🏃');
             return;
         }
         
@@ -67,7 +67,7 @@ const roleDefender = {
                         
                         if(!fleePath.incomplete && fleePath.path.length > 0) {
                             creep.move(creep.pos.getDirectionTo(fleePath.path[0]));
-                            creep.say('🏹 远程!');
+                            creep.say('🏹');
                             return;
                         }
                     }
@@ -77,7 +77,7 @@ const roleDefender = {
             // 如果有ATTACK部件且敌人在攻击范围内，进行近战攻击
             if(this.countBodyParts(creep, ATTACK) > 0 && range <= 1) {
                 creep.attack(target);
-                creep.say('⚔️ 近战!');
+                creep.say('⚔️');
             }
             
             // 移动逻辑
@@ -194,7 +194,7 @@ const roleDefender = {
         
         // 定期切换巡逻状态提示
         if(Game.time % 10 === 0) {
-            creep.say('🛡️ 巡逻');
+            creep.say('🛡️');
         }
     },
     

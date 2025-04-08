@@ -24,7 +24,7 @@ const roleSigner = {
                 visualizePathStyle: {stroke: '#ffaa00'},
                 reusePath: 50
             });
-            creep.say('🚶前往');
+            creep.say('🚶');
             return;
         }
         
@@ -37,12 +37,12 @@ const roleSigner = {
                     visualizePathStyle: {stroke: '#ffffff'},
                     reusePath: 20
                 });
-                creep.say('🖊️接近');
+                creep.say('🖊️');
             }
             else if(result === OK) {
                 // 签名成功，任务完成，自杀
                 console.log(`签名者 ${creep.name} 已成功在房间 ${creep.room.name} 签名: "${creep.memory.signText}"`);
-                creep.say('✓完成');
+                creep.say('✓');
                 creep.suicide();
             }
             else {

@@ -13,12 +13,35 @@ const utils = {
         // 如果在工作模式并且能量为空，切换到采集模式
         if(creep.memory.working && creep.store[RESOURCE_ENERGY] === 0) {
             creep.memory.working = false;
-            if(collectMessage) creep.say(collectMessage);
+            
+            // 只有transfer角色保留文字消息，其他角色全部使用emoji
+            if(creep.memory.role === 'transfer') {
+                if(collectMessage) creep.say(collectMessage);
+            } else {
+                // 为其他角色使用纯emoji
+                creep.say('🔄');
+            }
         }
         // 如果在采集模式并且能量已满，切换到工作模式
         if(!creep.memory.working && creep.store.getFreeCapacity() === 0) {
             creep.memory.working = true;
-            if(workMessage) creep.say(workMessage);
+            
+            // 只有transfer角色保留文字消息，其他角色全部使用emoji
+            if(creep.memory.role === 'transfer') {
+                if(workMessage) creep.say(workMessage);
+            } else {
+                // 为其他角色选择合适的emoji
+                if(creep.memory.role === 'harvester') creep.say('⚡');
+                else if(creep.memory.role === 'builder') creep.say('🚧');
+                else if(creep.memory.role === 'upgrader') creep.say('⬆️');
+                else if(creep.memory.role === 'repairer') creep.say('🔧');
+                else if(creep.memory.role === 'wallRepairer') creep.say('🧱');
+                else if(creep.memory.role === 'hauler') creep.say('📦');
+                else if(creep.memory.role === 'miner') creep.say('⛏️');
+                else if(creep.memory.role === 'remoteHauler') creep.say('🚚');
+                else if(creep.memory.role === 'remoteMiner') creep.say('🏔️');
+                else creep.say('✅');
+            }
         }
     },
     
