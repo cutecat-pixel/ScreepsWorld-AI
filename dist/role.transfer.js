@@ -27,7 +27,7 @@ const roleTransfer = {
             creep.say('📦 ' + nonEnergyType);
         } else {
             // 正常状态切换逻辑
-            utils.switchWorkState(creep, '🔄 收集', '📦 存储');
+            utils.switchWorkState(creep, '🔄', '📦');
         }
         
         // 如果在工作模式（存储资源到STORAGE）
@@ -142,7 +142,7 @@ const roleTransfer = {
         // 如果已经有化合物，立即切换到存储模式
         if(hasNonEnergyResources) {
             creep.memory.working = true;
-            creep.say('📦 存矿物');
+            creep.say('📦');
             
             // 立即执行存储逻辑，不等待下一个tick
             this.storeResources(creep, true);
