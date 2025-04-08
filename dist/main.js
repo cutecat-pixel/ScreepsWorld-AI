@@ -154,7 +154,7 @@ const stateScanner = function () {
   
     if (!Memory.stats) Memory.stats = {}
     
-    // 统计 GCL / GPL 的升级百分比和等级
+    // 保留基础统计数据
     Memory.stats.gcl = (Game.gcl.progress / Game.gcl.progressTotal) * 100
     Memory.stats.gclLevel = Game.gcl.level
     Memory.stats.gpl = (Game.gpl.progress / Game.gpl.progressTotal) * 100
