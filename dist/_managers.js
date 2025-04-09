@@ -6,4 +6,5 @@ module.exports = {
     tower: require('manager.tower'),
     invasion: require('manager.invasion'),
     link: require('manager.link'),
+    movement: require('manager.movement'),
 }; 

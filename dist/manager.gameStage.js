@@ -51,7 +51,7 @@ const GAME_STAGES = {
             repairer: 1,
             miner: 2,
             hauler: 2,
-            defender: 1,
+            defender: 0,
             wallRepairer: 1,
             transfer: 0
         }
@@ -237,7 +237,7 @@ function getCreepCountsByRole(room, gameStage) {
     // 3. 处理防御者的生成逻辑
     if(isUnderAttack) {
         // 如果房间正在被攻击
-        if(room.controller.level > 3) {
+        if(room.controller.level >= 3) {
             // 如果控制器等级大于3级，检查塔的能量情况
             const towers = room.find(FIND_MY_STRUCTURES, {
                 filter: s => s.structureType === STRUCTURE_TOWER

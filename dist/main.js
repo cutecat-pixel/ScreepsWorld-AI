@@ -30,6 +30,27 @@ global.signRoom = function(spawnRoomName, targetRoomName, signText) {
     return _roles.signer.createSignerTask(spawnRoomName, targetRoomName, signText);
 };
 
+// 添加移动优化辅助函数
+global.printMovementStats = function() {
+    return _managers.movement.printStats();
+};
+
+global.clearRoomPaths = function(roomName) {
+    return _managers.movement.clearPathsInRoom(roomName);
+};
+
+global.avoidRoom = function(roomName) {
+    return _managers.movement.addRoomToAvoid(roomName);
+};
+
+global.allowRoom = function(roomName) {
+    return _managers.movement.removeRoomToAvoid(roomName);
+};
+
+global.clearRoomCostMatrix = function(roomName) {
+    return _managers.movement.clearRoomCostMatrix(roomName);
+};
+
 // 添加手动生成防御者辅助函数
 global.spawnDefender = function(spawnRoomName, targetRoomName, priority = 1) {
     // 确保有生成队列
@@ -105,6 +126,12 @@ global.cancelRemoteBuilders = function(targetRoomName) {
  * 每tick会自动调用这个函数
  */
 module.exports.loop = function() {
+    // 初始化移动优化系统（如果是第一次运行或重置）
+    if(!global.moveOptimized) {
+        _managers.movement.initialize();
+        global.moveOptimized = true;
+    }
+    
     // 清理内存
     _managers.memory.cleanupMemory();
     
