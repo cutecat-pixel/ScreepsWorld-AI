@@ -167,7 +167,14 @@ module.exports.loop = function() {
     // 每100个tick报告一次统计信息
     if(Game.time % 100 === 0) {
         _managers.memory.reportStats();
+        // 当CPU bucket达到10000时生成pixel
+        if(Game.cpu.bucket >= 10000) {
+            Game.cpu.generatePixel();
+            console.log(`已使用10000 CPU bucket兑换1个pixel，当前bucket: ${Game.cpu.bucket}`);
+        }
     }
+
+    
 
     stateScanner();
 };
