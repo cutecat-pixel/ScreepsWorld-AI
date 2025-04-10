@@ -122,6 +122,11 @@ const creepManager = {
             memory.mode = config.mode;
         }
         
+        // 设置矿工不被对穿
+        if(role === 'remoteMiner') {
+            memory.dontPullMe = true;
+        }
+        
         // 尝试生成新的creep
         const result = spawn.spawnCreep(body, newName, { memory });
         
@@ -169,13 +174,21 @@ const creepManager = {
         // 创建唯一名称
         const newName = request.role + Game.time;
         
+        // 准备内存对象
+        let memory = request.memory || {
+            role: request.role,
+            working: false,
+            homeRoom: room.name
+        };
+        
+        // 对特定角色设置dontPullMe为true，防止被对穿
+        if(['miner', 'builder', 'upgrader', 'mineralHarvester'].includes(request.role) && !memory.dontPullMe) {
+            memory.dontPullMe = true;
+        }
+        
         // 尝试生成新的creep
         const result = spawn.spawnCreep(body, newName, {
-            memory: request.memory || {
-                role: request.role,
-                working: false,
-                homeRoom: room.name
-            }
+            memory: memory
         });
         
         // 如果成功生成，输出通知并从队列中移除
@@ -290,13 +303,21 @@ const creepManager = {
         // 创建唯一名称
         const newName = role + Game.time;
         
+        // 准备内存对象，特定角色设置不对穿属性
+        const memory = {
+            role: role,
+            working: false,
+            homeRoom: room.name
+        };
+        
+        // 对特定角色设置dontPullMe为true，防止被对穿
+        if(['miner', 'builder', 'upgrader', 'mineralHarvester'].includes(role)) {
+            memory.dontPullMe = true;
+        }
+        
         // 尝试生成新的creep
         const result = spawn.spawnCreep(body, newName, {
-            memory: {
-                role: role,
-                working: false,
-                homeRoom: room.name
-            }
+            memory: memory
         });
         
         // 如果成功生成，输出通知
@@ -315,6 +336,11 @@ const creepManager = {
             
             // 获取角色
             const role = creep.memory.role || 'harvester';
+            
+            // 为特定角色设置dontPullMe属性，防止被对穿
+            if(['miner', 'builder', 'upgrader', 'mineralHarvester'].includes(role) && !creep.memory.dontPullMe) {
+                creep.memory.dontPullMe = true;
+            }
             
             // 尝试获取这个角色的模块
             const roleModule = roles[role];

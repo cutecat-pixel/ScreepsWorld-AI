@@ -236,7 +236,7 @@ const roleHauler = {
             }
             
             // 高级阶段前，如果以上建筑都不需要能量，则将能量送到STORAGE
-            if(targets.length === 0 && creep.room.controller.level < 5) {
+            if(targets.length === 0 && creep.room.controller.level < 4) {
                 const storage = creep.room.find(FIND_STRUCTURES, {
                     filter: s => s.structureType === STRUCTURE_STORAGE && 
                               s.store.getFreeCapacity(RESOURCE_ENERGY) > 0
@@ -414,7 +414,7 @@ const roleHauler = {
         let body = [];
         
         // 运输者主要需要CARRY和MOVE部件
-        if(gameStage.level >= 5 && energy >= 1800) {
+        if(gameStage.level >= 7 && energy >= 1800) {
             // 后期阶段配置，更大容量
             body = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY,
                    CARRY, CARRY, CARRY, CARRY, CARRY,

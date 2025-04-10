@@ -111,7 +111,11 @@ const roleRepairer = {
         let body = [];
         
         // 根据游戏阶段和能量调整身体部件
-        if(gameStage.level >= 4 && energy >= 800) {
+        if(gameStage.level >= 6 && energy >= 1000) {
+            // 高级阶段配置，强化WORK和CARRY
+            body = [WORK, WORK, WORK, WORK, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE];
+        }
+        else if(gameStage.level >= 4 && energy >= 800) {
             // 高级阶段配置，强化WORK和CARRY
             body = [WORK, WORK, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE];
         }

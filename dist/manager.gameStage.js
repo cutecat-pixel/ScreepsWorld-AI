@@ -63,7 +63,7 @@ const GAME_STAGES = {
         level: 4,
         creepCounts: {
             harvester: 0,
-            upgrader: 3,
+            upgrader: 2,
             builder: 2,
             repairer: 1,
             miner: 2,
@@ -83,11 +83,49 @@ const GAME_STAGES = {
             upgrader: 2,
             builder: 2,
             repairer: 1,
-            miner: 3,
+            miner: 2,
             hauler: 2,
-            defender: 1,
+            defender: 0,
             wallRepairer: 1,
             transfer: 2
+        }
+    },
+    
+    // 矿物开发阶段：开始提取并处理矿物
+    MINERAL: {
+        name: '矿物阶段',
+        level: 6,
+        creepCounts: {
+            harvester: 0,
+            upgrader: 1,
+            builder: 1,
+            repairer: 1,
+            miner: 2,
+            hauler: 2,
+            defender: 0,
+            wallRepairer: 1,
+            transfer: 2,
+            mineralHarvester: 0, // 默认值0，在有Extractor时动态调整
+            mineralHauler: 0     // 默认值0，在有Extractor时动态调整
+        }
+    },
+    
+    // 终极阶段：全面发展与优化
+    END: {
+        name: '终极阶段',
+        level: 7,
+        creepCounts: {
+            harvester: 0,
+            upgrader: 1,
+            builder: 1,
+            repairer: 1,
+            miner: 2,
+            hauler: 2,
+            defender: 0,
+            wallRepairer: 1,
+            transfer: 2,
+            mineralHarvester: 0, // 默认值0，在有Extractor时动态调整
+            mineralHauler: 0     // 默认值0，在有Extractor时动态调整
         }
     }
 };
@@ -107,10 +145,16 @@ function getRoomStage(room) {
     }
     
     // 基于控制器等级初步判断
-    if(room.controller.level >= 7) {
-        roomStage = GAME_STAGES.LATE;
-    } 
+    if(room.controller.level >= 8) {
+        roomStage = GAME_STAGES.END;
+    }
+    else if(room.controller.level >= 6) {
+        roomStage = GAME_STAGES.MINERAL;
+    }
     else if(room.controller.level >= 5) {
+        roomStage = GAME_STAGES.LATE;
+    }
+    else if(room.controller.level >= 4) {
         roomStage = GAME_STAGES.ADVANCED;
     }
     else if(room.controller.level >= 3) {
@@ -267,6 +311,34 @@ function getCreepCountsByRole(room, gameStage) {
         } else {
             // 低等级房间直接增加防御者
             targetCounts.defender += 1;
+        }
+    }
+    
+    // 4. 矿物采集者和运输者的生成逻辑
+    if(gameStage.level >= 6) { // 只有RCL 6级以上才考虑矿物处理
+        // 检查房间中是否有Extractor
+        const extractors = room.find(FIND_MY_STRUCTURES, {
+            filter: s => s.structureType === STRUCTURE_EXTRACTOR
+        });
+        
+        if(extractors.length > 0) {
+            // 有Extractor，检查矿物是否有效
+            const minerals = room.find(FIND_MINERALS);
+            
+            if(minerals.length > 0 && minerals[0].mineralAmount > 0) {
+                // 矿物存在且有矿物量，需要矿物采集者和运输者
+                // 检查矿物附近是否有容器
+                const mineral = minerals[0];
+                const containers = mineral.pos.findInRange(FIND_STRUCTURES, 1, {
+                    filter: s => s.structureType === STRUCTURE_CONTAINER
+                });
+                
+                if(containers.length > 0) {
+                    // 有容器，启用矿物采集和运输
+                    targetCounts.mineralHarvester = 1;
+                    targetCounts.mineralHauler = 1;
+                }
+            }
         }
     }
     

@@ -256,7 +256,7 @@ const roleTransfer = {
         // 查找装满能量的容器
         const containers = creep.room.find(FIND_STRUCTURES, {
             filter: s => s.structureType === STRUCTURE_CONTAINER && 
-                      s.store.getUsedCapacity(RESOURCE_ENERGY) > 50
+                      s.store.getUsedCapacity(RESOURCE_ENERGY) > creep.store.getFreeCapacity(RESOURCE_ENERGY)
         });
         
         // 按照能量量排序容器
@@ -325,7 +325,7 @@ const roleTransfer = {
         let body = [];
         
         // 转运者主要需要CARRY和MOVE部件
-        if(gameStage.level >= 5 && energy >= 1800) {
+        if(gameStage.level >= 7 && energy >= 1800) {
             // 后期阶段配置，更大容量
             body = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY,
                    CARRY, CARRY, CARRY, CARRY, CARRY,
