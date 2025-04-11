@@ -104,7 +104,7 @@ const GAME_STAGES = {
             hauler: 2,
             defender: 0,
             wallRepairer: 1,
-            transfer: 2,
+            transfer: 1,
             mineralHarvester: 0, // 默认值0，在有Extractor时动态调整
             mineralHauler: 0,     // 默认值0，在有Extractor时动态调整
             terminalHauler: 1
@@ -124,7 +124,7 @@ const GAME_STAGES = {
             hauler: 2,
             defender: 0,
             wallRepairer: 1,
-            transfer: 2,
+            transfer: 1,
             mineralHarvester: 0, // 默认值0，在有Extractor时动态调整
             mineralHauler: 0 ,    // 默认值0，在有Extractor时动态调整
             terminalHauler: 1

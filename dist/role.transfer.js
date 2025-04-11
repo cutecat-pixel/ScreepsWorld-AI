@@ -144,7 +144,7 @@ const roleTransfer = {
             creep.memory.working = true;
             creep.say('📦');
             
-            // 立即执行存储逻辑，不等待下一个tick
+            // 立即执行存储逻辑
             this.storeResources(creep, true);
             return;
         }
@@ -205,10 +205,8 @@ const roleTransfer = {
                     // 成功提取后，立即切换到存储模式
                     creep.memory.working = true;
                     
-                    // 立即执行存储逻辑，不等待下一个tick
-                    setTimeout(() => {
-                        this.storeResources(creep, true);
-                    }, 0);
+                    // 立即执行存储逻辑
+                    this.storeResources(creep, true);
                 }
                 return;
             }
@@ -233,10 +231,8 @@ const roleTransfer = {
                 // 成功拾取后，立即切换到存储模式
                 creep.memory.working = true;
                 
-                // 立即执行存储逻辑，不等待下一个tick
-                setTimeout(() => {
-                    this.storeResources(creep, true);
-                }, 0);
+                // 立即执行存储逻辑
+                this.storeResources(creep, true);
             }
             return;
         }
