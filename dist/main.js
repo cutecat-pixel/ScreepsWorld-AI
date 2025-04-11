@@ -297,6 +297,49 @@ global.disableTerminalEnergyMaintenance = function(roomName) {
     return _managers.terminal.disableTerminalEnergyMaintenance(roomName);
 };
 
+// 添加手动生成远程运输者的函数，用于从指定房间的STORAGE搬运能量
+global.spawnStorageHauler = function(sourceRoomName, targetRoomName, count = 1, priority = 2) {
+    // 检查源房间是否存在
+    const sourceRoom = Game.rooms[sourceRoomName];
+    if(!sourceRoom) {
+        return `错误：无法访问源房间 ${sourceRoomName}`;
+    }
+    
+    // 检查源房间是否有生成点
+    const spawns = sourceRoom.find(FIND_MY_SPAWNS);
+    if(spawns.length === 0) {
+        return `错误：源房间 ${sourceRoomName} 没有可用的生成点`;
+    }
+    
+    // 确保有生成队列
+    if(!Memory.spawnQueue) {
+        Memory.spawnQueue = {};
+    }
+    
+    if(!Memory.spawnQueue[sourceRoomName]) {
+        Memory.spawnQueue[sourceRoomName] = [];
+    }
+    
+    // 生成指定数量的远程运输者
+    for(let i = 0; i < count; i++) {
+        // 添加到生成队列
+        Memory.spawnQueue[sourceRoomName].push({
+            role: 'remoteHauler',
+            priority: priority,
+            memory: {
+                role: 'remoteHauler',
+                homeRoom: sourceRoomName,   // 主房间（运输目标）
+                targetRoom: targetRoomName, // 目标房间（能量来源）
+                working: false,
+                waiting: false,
+                storageHauler: true         // 标记这是专门从Storage搬运的运输者
+            }
+        });
+    }
+    
+    return `已添加${count}个从 ${targetRoomName} 的Storage向 ${sourceRoomName} 运输能量的远程运输者任务`;
+};
+
 // 添加查找资源最优价格的函数
 global.findBestPrice = function(resourceType = RESOURCE_ENERGY, orderType = ORDER_SELL) {
     // 获取市场上所有指定类型的订单

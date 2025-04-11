@@ -61,6 +61,30 @@ const roleRemoteHauler = {
                 return;
             }
             
+            // 判断是否是专门从Storage搬运的运输者
+            if(creep.memory.storageHauler) {
+                // 查找目标房间的Storage
+                const storage = creep.room.storage;
+                
+                if(storage && storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                    // 从Storage提取能量
+                    if(creep.withdraw(storage, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                        creep.moveTo(storage, {visualizePathStyle: {stroke: '#ffaa00'}});
+                    }
+                    return;
+                } else {
+                    // 如果Storage不存在或没有能量，显示提示
+                    creep.say('❓Storage');
+                    
+                    // 移动到房间中心等待
+                    creep.moveTo(new RoomPosition(25, 25, creep.room.name), {
+                        visualizePathStyle: {stroke: '#ffaa00'},
+                        range: 10
+                    });
+                    return;
+                }
+            }
+            
             // 已经在目标房间，寻找能量来源
             // 优先考虑从容器、墓碑或掉落的资源中获取能量
             let source = null;
@@ -234,7 +258,23 @@ const roleRemoteHauler = {
     getBody: function(energy, gameStage) {
         let body = [];
         
-        if(gameStage.level >= 3 && energy >= 600) {
+        // 如果是用于storage hauler的特殊配置
+        if(gameStage.level >= 6 && energy >= 1500) {
+            // 高级阶段配置，大量CARRY和足够的MOVE
+            body = [
+                CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY,
+                CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY,
+                MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE
+            ];
+        }
+        else if(gameStage.level >= 4 && energy >= 1000) {
+            // 中级阶段强化配置
+            body = [
+                CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY,
+                MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE
+            ];
+        }
+        else if(gameStage.level >= 3 && energy >= 600) {
             // 中级阶段配置
             body = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY,
                    MOVE, MOVE, MOVE, MOVE, MOVE, MOVE];
