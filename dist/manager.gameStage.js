@@ -106,7 +106,8 @@ const GAME_STAGES = {
             wallRepairer: 1,
             transfer: 2,
             mineralHarvester: 0, // 默认值0，在有Extractor时动态调整
-            mineralHauler: 0     // 默认值0，在有Extractor时动态调整
+            mineralHauler: 0,     // 默认值0，在有Extractor时动态调整
+            terminalHauler: 1
         }
     },
     
@@ -125,7 +126,8 @@ const GAME_STAGES = {
             wallRepairer: 1,
             transfer: 2,
             mineralHarvester: 0, // 默认值0，在有Extractor时动态调整
-            mineralHauler: 0     // 默认值0，在有Extractor时动态调整
+            mineralHauler: 0 ,    // 默认值0，在有Extractor时动态调整
+            terminalHauler: 1
         }
     }
 };
@@ -322,23 +324,52 @@ function getCreepCountsByRole(room, gameStage) {
         });
         
         if(extractors.length > 0) {
+            
             // 有Extractor，检查矿物是否有效
             const minerals = room.find(FIND_MINERALS);
             
-            if(minerals.length > 0 && minerals[0].mineralAmount > 0) {
-                // 矿物存在且有矿物量，需要矿物采集者和运输者
-                // 检查矿物附近是否有容器
-                const mineral = minerals[0];
-                const containers = mineral.pos.findInRange(FIND_STRUCTURES, 1, {
-                    filter: s => s.structureType === STRUCTURE_CONTAINER
-                });
+            if(minerals.length > 0) {
                 
-                if(containers.length > 0) {
-                    // 有容器，启用矿物采集和运输
-                    targetCounts.mineralHarvester = 1;
-                    targetCounts.mineralHauler = 1;
+                if(minerals[0].mineralAmount > 0) {
+                    // 矿物存在且有矿物量，需要矿物采集者和运输者
+                    // 检查矿物附近是否有容器
+                    const mineral = minerals[0];
+                    const containers = mineral.pos.findInRange(FIND_STRUCTURES, 1, {
+                        filter: s => s.structureType === STRUCTURE_CONTAINER
+                    });
+                    
+                    // 检查是否有建设中的容器
+                    const containerSites = mineral.pos.findInRange(FIND_CONSTRUCTION_SITES, 1, {
+                        filter: s => s.structureType === STRUCTURE_CONTAINER
+                    });
+                    
+                    if(containers.length > 0) {
+                        // 有容器，启用矿物采集和运输
+                        targetCounts.mineralHarvester = 1;
+                        targetCounts.mineralHauler = 1;
+                    }
                 }
             }
+        }
+        
+        // 5. 终端运输者的生成逻辑
+        if(room.terminal) {
+            // 检查是否有终端任务
+            const hasTerminalTasks = room.memory.terminalTasks && room.memory.terminalTasks.length > 0;
+            
+            // 检查是否启用了自动交易
+            const isAutoTradingEnabled = room.memory.autoTrading && room.memory.autoTrading.enabled;
+            
+            // 如果有终端任务或启用了自动交易，需要终端运输者
+            if(hasTerminalTasks || isAutoTradingEnabled) {
+                targetCounts.terminalHauler = 1;
+            } else {
+                // 没有终端任务，不需要专门的终端运输者
+                targetCounts.terminalHauler = 0;
+            }
+        } else {
+            // 没有终端，不需要终端运输者
+            targetCounts.terminalHauler = 0;
         }
     }
     

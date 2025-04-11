@@ -11,11 +11,11 @@ const roleMineralHauler = {
         // 状态切换逻辑
         if(creep.memory.hauling && creep.store.getFreeCapacity() === creep.store.getCapacity()) {
             creep.memory.hauling = false;
-            creep.say('🔄 收集');
+            creep.say('🔄');
         }
         if(!creep.memory.hauling && creep.store.getFreeCapacity() === 0) {
             creep.memory.hauling = true;
-            creep.say('📦 运输');
+            creep.say('📦');
         }
         
         // 如果没有指定矿物容器，查找并分配
@@ -28,7 +28,7 @@ const roleMineralHauler = {
             // 检查是否有Storage
             const storage = creep.room.storage;
             if(!storage) {
-                creep.say('❓无Storage');
+                creep.say('❓');
                 return;
             }
             
@@ -60,7 +60,7 @@ const roleMineralHauler = {
             }
             
             if(!hasResources) {
-                creep.say('🕒 等资源');
+                creep.say('🕒');
                 return;
             }
             
@@ -84,7 +84,7 @@ const roleMineralHauler = {
         // 查找房间中的矿物
         const minerals = creep.room.find(FIND_MINERALS);
         if(minerals.length === 0) {
-            creep.say('❓无矿物');
+            creep.say('❓');
             return;
         }
         
@@ -96,9 +96,9 @@ const roleMineralHauler = {
         
         if(containers.length > 0) {
             creep.memory.containerId = containers[0].id;
-            creep.say('✅找到容器');
+            creep.say('✅');
         } else {
-            creep.say('❓无容器');
+            creep.say('❓');
         }
     },
     

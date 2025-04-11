@@ -248,7 +248,7 @@ const creepManager = {
      */
     getCreepPriorityOrder: function(room, gameStage) {
         // 基本优先级顺序
-        let priorityOrder = ['harvester', 'upgrader', 'builder', 'repairer', 'miner', 'hauler', 'defender', 'wallRepairer', 'claimer', 'dismantler', 'remoteMiner', 'remoteHauler', 'transfer', 'signer', 'remoteBuilder'];
+        let priorityOrder = ['harvester', 'upgrader', 'builder', 'repairer', 'miner', 'hauler', 'defender', 'wallRepairer', 'claimer', 'dismantler', 'remoteMiner', 'remoteHauler', 'transfer', 'signer', 'remoteBuilder', 'mineralHarvester', 'mineralHauler', 'terminalHauler'];
         
         // 紧急情况的优先级调整
         
@@ -265,14 +265,60 @@ const creepManager = {
             return ['defender'].concat(priorityOrder.filter(r => r !== 'defender'));
         }
         
+        // 终端相关检查
+        if(gameStage.level >= 6 && room.terminal) {
+            const hasTerminalTasks = room.memory.terminalTasks && room.memory.terminalTasks.length > 0;
+            const isAutoTradingEnabled = room.memory.autoTrading && room.memory.autoTrading.enabled;
+            
+            // 如果有终端任务或自动交易已启用，提高终端运输者的优先级
+            if(hasTerminalTasks || isAutoTradingEnabled) {
+                // 移除终端运输者，并添加到优先位置
+                const withoutTerminalHauler = priorityOrder.filter(r => r !== 'terminalHauler');
+                const index = withoutTerminalHauler.indexOf('hauler') + 1;
+                withoutTerminalHauler.splice(index, 0, 'terminalHauler');
+                priorityOrder = withoutTerminalHauler;
+            }
+        }
+        
+        // 矿物处理相关检查
+        if(gameStage.level >= 6) {
+            // 检查房间中是否有Extractor
+            const extractors = room.find(FIND_MY_STRUCTURES, {
+                filter: s => s.structureType === STRUCTURE_EXTRACTOR
+            });
+            
+            // 检查房间中的矿物和容器
+            if(extractors.length > 0) {
+                const minerals = room.find(FIND_MINERALS);
+                
+                if(minerals.length > 0 && minerals[0].mineralAmount > 0) {
+                    const containers = minerals[0].pos.findInRange(FIND_STRUCTURES, 1, {
+                        filter: s => s.structureType === STRUCTURE_CONTAINER
+                    });
+                    
+                    if(containers.length > 0) {
+                        // 提高矿物采集者和运输者的优先级
+                        // 移除它们，然后添加到优先位置
+                        const withoutMineral = priorityOrder.filter(r => 
+                            r !== 'mineralHarvester' && r !== 'mineralHauler');
+                            
+                        // 在miner和hauler之后添加矿物角色
+                        const index = withoutMineral.indexOf('hauler') + 1;
+                        withoutMineral.splice(index, 0, 'mineralHarvester', 'mineralHauler');
+                        priorityOrder = withoutMineral;
+                    }
+                }
+            }
+        }
+        
         // 根据游戏阶段调整优先级
         if(gameStage.level >= 4) {
             // 高级阶段，矿工、运输者和转运者的优先级提高
-            priorityOrder = ['harvester', 'miner', 'hauler', 'transfer', 'upgrader', 'builder', 'repairer', 'defender', 'wallRepairer', 'claimer', 'dismantler', 'remoteMiner', 'remoteHauler'];
+            priorityOrder = ['harvester', 'miner', 'hauler', 'transfer', 'upgrader', 'builder', 'repairer', 'defender', 'wallRepairer', 'mineralHarvester', 'mineralHauler', 'terminalHauler', 'claimer', 'dismantler', 'remoteMiner', 'remoteHauler'];
         }
         else if(gameStage.level >= 3) {
             // 中期阶段，矿工和运输者的优先级提高
-            priorityOrder = ['harvester', 'miner', 'hauler', 'upgrader', 'builder', 'repairer', 'defender', 'wallRepairer', 'claimer', 'dismantler', 'remoteMiner', 'remoteHauler', 'transfer'];
+            priorityOrder = ['harvester', 'miner', 'hauler', 'upgrader', 'builder', 'repairer', 'defender', 'wallRepairer', 'claimer', 'dismantler', 'remoteMiner', 'remoteHauler', 'transfer', 'mineralHarvester', 'mineralHauler', 'terminalHauler'];
         }
         
         return priorityOrder;

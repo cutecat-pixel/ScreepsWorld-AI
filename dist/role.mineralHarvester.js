@@ -31,7 +31,7 @@ const roleMineralHarvester = {
                 creep.memory.containerId = containers[0].id;
             } else {
                 // 如果没有找到容器，说一声并等待
-                creep.say('🔍等容器');
+                creep.say('🔍');
                 return;
             }
         }
@@ -45,7 +45,7 @@ const roleMineralHarvester = {
         
         // 检查矿物是否有cooldown
         if(mineral.mineralAmount === 0) {
-            creep.say('⏳等再生');
+            creep.say('⏳');
             return;
         }
         
@@ -65,8 +65,8 @@ const roleMineralHarvester = {
         } else if(result === ERR_NOT_FOUND) {
             // 矿物可能被删除，清除记忆
             delete creep.memory.mineralId;
-        } else {
-            creep.say('❓' + result);
+        } else if (result === ERR_TIRED) {
+            creep.say('💤');
         }
     },
     

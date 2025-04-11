@@ -14,6 +14,9 @@
    - Miner：专业矿工，专注采集能量
    - Hauler：运输工，负责物流
    - Defender：防御者，保护房间安全
+   - MineralHarvester：矿物采集者
+   - MineralHauler：矿物运输工
+   - TerminalHauler：终端运输者，专注于终端物流
 
 2. **管理器模块**：
    - Creep管理器：管理creep的生成、分配和行为
@@ -21,6 +24,7 @@
    - LINK管理器：控制LINK的能量传输
    - 内存管理器：维护和清理游戏内存数据
    - 游戏阶段管理器：判断当前游戏状态并调整策略
+   - 终端管理器：管理终端交易和物流
 
 3. **工具模块**：提供各种实用的辅助功能
 
@@ -31,6 +35,7 @@
 - **资源优化**：高效利用能量和其他资源
 - **智能防御**：自动应对敌人入侵
 - **内存管理**：定期清理无效数据，避免内存泄漏
+- **市场交易**：自动管理和执行矿物交易
 
 ## 使用方法
 
@@ -57,11 +62,105 @@
 - `main.js`：修改主循环逻辑
 - 各角色文件：调整特定角色的行为逻辑
 
+## 市场交易功能
+
+本系统提供了完善的市场交易功能，可以方便地进行资源交易和管理：
+
+### 自动K矿物交易
+
+K矿物自动交易系统会监控市场上的K矿物订单，并自动完成交易：
+
+1. **启用K矿物自动交易**：
+   ```javascript
+   enableKMineralTrading('房间名', 最小保留数量); // 最小保留数量默认为1000
+   ```
+
+2. **禁用K矿物自动交易**：
+   ```javascript
+   disableKMineralTrading('房间名');
+   ```
+
+当自动交易启用后，系统会自动查找价格最优的K矿物订单，并在保证最小库存的情况下进行交易。
+
+### 资源转移
+
+在终端和Storage之间转移资源：
+
+1. **从终端转移资源到Storage**：
+   ```javascript
+   transferFromTerminal('房间名', RESOURCE_ENERGY); // 转移所有能量
+   transferFromTerminal('房间名', RESOURCE_ENERGY, 5000); // 转移5000单位能量
+   transferFromTerminal('房间名', RESOURCE_KEANIUM); // 转移所有K矿物
+   ```
+
+### 市场价格查询
+
+在创建订单前，可以查询市场上的最佳价格：
+
+```javascript
+findBestPrice(RESOURCE_ENERGY, ORDER_SELL); // 查询能量的最低卖出价格
+findBestPrice(RESOURCE_ENERGY, ORDER_BUY);  // 查询能量的最高收购价格
+findBestPrice(RESOURCE_KEANIUM, ORDER_SELL); // 查询K矿物的最低卖出价格
+```
+
+### 创建购买订单
+
+可以创建购买资源的长期订单：
+
+```javascript
+createBuyOrder('房间名', RESOURCE_ENERGY, 10000, 0.2); // 创建购买10000能量的订单，价格0.2/单位
+createBuyOrder('房间名', RESOURCE_KEANIUM, 5000, 0.5); // 创建购买5000 K矿物的订单，价格0.5/单位
+```
+
+### 自动准备交易所需能量
+
+为了方便交易，系统提供了自动准备交易所需能量的功能：
+
+```javascript
+prepareTerminalEnergy('房间名', 10000); // 确保终端中有至少10000能量
+```
+
+您也可以使用集成的函数一步完成订单创建和能量准备：
+
+```javascript
+prepareBuyOrder('房间名', RESOURCE_ENERGY, 10000, 0.2, 5000); 
+// 创建购买10000能量的订单，价格0.2/单位，并确保终端中有5000能量作为交易费用
+```
+
+### 长期订单能量维护
+
+对于长期订单，系统提供了自动维护终端能量水平的功能，确保总是有足够的能量支付交易手续费：
+
+```javascript
+// 设置终端能量维护，保持至少5000能量，每100tick检查一次
+setTerminalEnergyMaintenance('房间名', 5000, 100);
+
+// 禁用终端能量维护
+disableTerminalEnergyMaintenance('房间名');
+```
+
+当您创建长期订单时，系统会自动启用能量维护功能，确保订单总是能够正常交易。您也可以手动调整维护的能量水平和检查频率，以适应不同的交易需求。
+
+### 直接购买资源
+
+如果需要立即获得资源，可以直接从市场购买：
+
+```javascript
+buyResourceFromMarket('房间名', RESOURCE_ENERGY, 5000, 0.3); // 购买5000能量，最高接受0.3/单位
+buyResourceFromMarket('房间名', RESOURCE_KEANIUM, 2000, 0.6); // 购买2000 K矿物，最高接受0.6/单位
+```
+
+系统会自动找到价格最低的订单进行购买，并将资源送到房间终端。如果终端能量不足以支付交易费用，系统会自动从Storage转移足够的能量到Terminal。您可以稍后使用`transferFromTerminal`将资源转移到Storage。
+
+所有与市场交易相关的操作都会自动处理好终端和Storage之间的资源流动，您无需额外操作。
+
 ## 注意事项
 
 - 系统会自动适应单房间和多房间情况
 - 在受到攻击时会自动增加防御者数量
 - 每100个tick会输出资源统计信息 
+- 交易功能需要房间中有终端(Terminal)设施
+- 自动交易需要房间同时有终端和存储(Storage)设施
 
 ## 远程部署环境准备和部署教程
 

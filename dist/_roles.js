@@ -16,5 +16,6 @@ module.exports = {
     signer: require('role.signer'),
     remoteBuilder: require('role.remoteBuilder'),
     mineralHarvester: require('role.mineralHarvester'),
-    mineralHauler: require('role.mineralHauler')
+    mineralHauler: require('role.mineralHauler'),
+    terminalHauler: require('role.terminalHauler')
 }; 
