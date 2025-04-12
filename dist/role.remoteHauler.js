@@ -17,15 +17,14 @@ const roleRemoteHauler = {
         if(creep.memory.working) {
             // 如果不在主房间，返回主房间
             if(creep.memory.homeRoom && creep.room.name !== creep.memory.homeRoom) {
-                const exitDir = Game.map.findExit(creep.room, creep.memory.homeRoom);
-                const exit = creep.pos.findClosestByPath(exitDir);
-                creep.moveTo(exit, {visualizePathStyle: {stroke: '#ffffff'}});
+                // 使用安全的房间导航方法
+                this.moveToRoom(creep, creep.memory.homeRoom, '#ffffff');
                 return;
             }
 
             // 已经在主房间，寻找需要能量的建筑
             const target = creep.room.find(FIND_STRUCTURES, {
-                filter: s => s.structureType === STRUCTURE_STORAGE && 
+                filter: s => (s.structureType === STRUCTURE_STORAGE) && 
                             s.store.getFreeCapacity(RESOURCE_ENERGY) > 0
             })[0];
 
@@ -55,9 +54,8 @@ const roleRemoteHauler = {
             
             // 如果不在目标房间，前往目标房间
             if(creep.memory.targetRoom && creep.room.name !== creep.memory.targetRoom) {
-                const exitDir = Game.map.findExit(creep.room, creep.memory.targetRoom);
-                const exit = creep.pos.findClosestByRange(exitDir);
-                creep.moveTo(exit, {visualizePathStyle: {stroke: '#ffaa00'}});
+                // 使用安全的房间导航方法
+                this.moveToRoom(creep, creep.memory.targetRoom, '#ffaa00');
                 return;
             }
             
@@ -150,6 +148,129 @@ const roleRemoteHauler = {
                 });
             }
         }
+    },
+    
+    /**
+     * 安全的房间间移动方法
+     * @param {Creep} creep - 要移动的creep
+     * @param {string} targetRoomName - 目标房间名称
+     * @param {string} pathColor - 路径可视化颜色
+     */
+    moveToRoom: function(creep, targetRoomName, pathColor) {
+        // 首先检查是否有保存的出口方向
+        if(!creep.memory._exitDir || !creep.memory._exitPos) {
+            // 尝试找到出口方向
+            const exitDir = Game.map.findExit(creep.room, targetRoomName);
+            
+            // 检查是否成功找到出口方向
+            if(exitDir === ERR_NO_PATH || exitDir === ERR_INVALID_ARGS) {
+                // 如果找不到路径，可能由于房间未探索或其他原因
+                creep.say('⚠️ 无路径');
+                
+                // 使用房间名称的排序规则直接计算大致方向
+                const [currentX, currentY] = this.parseRoomName(creep.room.name);
+                const [targetX, targetY] = this.parseRoomName(targetRoomName);
+                
+                // 计算大致方向
+                let direction;
+                if(targetX > currentX) direction = RIGHT;
+                else if(targetX < currentX) direction = LEFT;
+                else if(targetY > currentY) direction = BOTTOM;
+                else direction = TOP;
+                
+                // 移动到该方向的边界
+                this.moveToRoomEdge(creep, direction, pathColor);
+                return;
+            }
+            
+            // 找到到目标房间的出口
+            const exit = creep.pos.findClosestByPath(exitDir);
+            
+            // 如果没有找到可达的出口（路径被阻塞或其他原因）
+            if(!exit) {
+                creep.say('⚠️ 无出口');
+                
+                // 移动到房间中心等待
+                creep.moveTo(new RoomPosition(25, 25, creep.room.name), {
+                    visualizePathStyle: {stroke: pathColor},
+                    range: 20
+                });
+                return;
+            }
+            
+            // 保存出口方向和位置以便重用
+            creep.memory._exitDir = exitDir;
+            creep.memory._exitPos = {x: exit.x, y: exit.y};
+        }
+        
+        // 使用已知的出口位置
+        const exitPos = new RoomPosition(
+            creep.memory._exitPos.x,
+            creep.memory._exitPos.y,
+            creep.room.name
+        );
+        
+        // 移动到出口
+        creep.moveTo(exitPos, {visualizePathStyle: {stroke: pathColor}});
+        
+        // 如果已到达出口附近，清除缓存的出口数据（为下一个房间做准备）
+        if(creep.pos.isNearTo(exitPos)) {
+            delete creep.memory._exitDir;
+            delete creep.memory._exitPos;
+        }
+    },
+    
+    /**
+     * 解析房间名称为坐标
+     * @param {string} roomName - 房间名称，格式如"W1N2"
+     * @returns {Array} - [x, y]坐标
+     */
+    parseRoomName: function(roomName) {
+        let x = 0;
+        let y = 0;
+        const match = roomName.match(/([WE])(\d+)([NS])(\d+)/);
+        
+        if(match) {
+            x = parseInt(match[2]);
+            if(match[1] === 'W') x = -x;
+            
+            y = parseInt(match[4]);
+            if(match[3] === 'N') y = -y;
+        }
+        
+        return [x, y];
+    },
+    
+    /**
+     * 移动到房间边缘
+     * @param {Creep} creep - 要移动的creep
+     * @param {number} direction - 移动方向常量（TOP、RIGHT等）
+     * @param {string} pathColor - 路径可视化颜色
+     */
+    moveToRoomEdge: function(creep, direction, pathColor) {
+        let targetX = 25;
+        let targetY = 25;
+        
+        // 根据方向设置目标位置在房间边缘
+        switch(direction) {
+            case TOP:
+                targetY = 0;
+                break;
+            case BOTTOM:
+                targetY = 49;
+                break;
+            case LEFT:
+                targetX = 0;
+                break;
+            case RIGHT:
+                targetX = 49;
+                break;
+        }
+        
+        // 移动到目标位置
+        creep.moveTo(new RoomPosition(targetX, targetY, creep.room.name), {
+            visualizePathStyle: {stroke: pathColor}
+        });
     },
     
     /**

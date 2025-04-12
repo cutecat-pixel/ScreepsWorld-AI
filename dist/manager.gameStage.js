@@ -104,7 +104,7 @@ const GAME_STAGES = {
             hauler: 2,
             defender: 0,
             wallRepairer: 1,
-            transfer: 1,
+            transfer: 2,
             mineralHarvester: 0, // 默认值0，在有Extractor时动态调整
             mineralHauler: 0,     // 默认值0，在有Extractor时动态调整
             terminalHauler: 1
@@ -124,7 +124,7 @@ const GAME_STAGES = {
             hauler: 2,
             defender: 0,
             wallRepairer: 1,
-            transfer: 1,
+            transfer: 2,
             mineralHarvester: 0, // 默认值0，在有Extractor时动态调整
             mineralHauler: 0 ,    // 默认值0，在有Extractor时动态调整
             terminalHauler: 1
@@ -370,6 +370,36 @@ function getCreepCountsByRole(room, gameStage) {
         } else {
             // 没有终端，不需要终端运输者
             targetCounts.terminalHauler = 0;
+        }
+    }
+    
+    // 6. 处理Storage Hauler的生成逻辑
+    if(!targetCounts.remoteHauler) targetCounts.remoteHauler = 0;
+    
+    // 如果房间内存中配置了Storage Haulers，添加到目标数量中
+    if(room.memory.storageHaulers) {
+        // 根据目标房间统计需要的运输者数量
+        for(const targetRoomName in room.memory.storageHaulers) {
+            // 确保这个房间对应的配置存在
+            if(room.memory.storageHaulers[targetRoomName]) {
+                // 获取需要的remoteHauler数量
+                const count = room.memory.storageHaulers[targetRoomName].count || 0;
+                
+                // 添加到目标数量中
+                targetCounts.remoteHauler += count;
+                
+                // 确保创建remoteHauler所需的配置
+                if(!Memory.creepConfigs) Memory.creepConfigs = {};
+                if(!Memory.creepConfigs.remoteHauler) Memory.creepConfigs.remoteHauler = {};
+                if(!Memory.creepConfigs.remoteHauler[room.name]) Memory.creepConfigs.remoteHauler[room.name] = {};
+                
+                // 设置或更新配置
+                Memory.creepConfigs.remoteHauler[room.name] = {
+                    targetRoom: targetRoomName,
+                    storageHauler: true,
+                    priority: room.memory.storageHaulers[targetRoomName].priority || 2
+                };
+            }
         }
     }
     

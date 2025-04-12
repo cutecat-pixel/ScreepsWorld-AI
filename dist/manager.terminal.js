@@ -424,6 +424,80 @@ const managerTerminal = {
         }
         
         return `房间 ${roomName} 的K矿物自动交易已禁用`;
+    },
+    
+    /**
+     * 清除所有终端任务
+     * @param {string} [roomName] - 可选，指定要清除任务的房间名称。如不指定则清除所有房间的终端任务
+     * @returns {string} - 操作结果信息
+     */
+    clearAllTerminalTasks: function(roomName) {
+        let clearedCount = 0;
+        let roomsAffected = 0;
+        
+        // 如果指定了房间名称，只清除该房间的任务
+        if(roomName) {
+            const room = Game.rooms[roomName];
+            if(!room) {
+                return `错误：无法访问房间 ${roomName}`;
+            }
+            
+            if(room.memory.terminalTasks && room.memory.terminalTasks.length > 0) {
+                clearedCount = room.memory.terminalTasks.length;
+                room.memory.terminalTasks = [];
+                roomsAffected = 1;
+                
+                // 清除任何正在执行任务的terminalHauler的任务记忆
+                this.clearCreepTaskMemory(room);
+                
+                return `已清除房间 ${roomName} 的所有终端任务 (${clearedCount} 个任务)`;
+            } else {
+                return `房间 ${roomName} 没有终端任务需要清除`;
+            }
+        } 
+        // 如果没有指定房间，清除所有可见房间的任务
+        else {
+            for(const name in Game.rooms) {
+                const room = Game.rooms[name];
+                
+                if(room.memory.terminalTasks && room.memory.terminalTasks.length > 0) {
+                    clearedCount += room.memory.terminalTasks.length;
+                    room.memory.terminalTasks = [];
+                    roomsAffected++;
+                    
+                    // 清除任何正在执行任务的terminalHauler的任务记忆
+                    this.clearCreepTaskMemory(room);
+                }
+            }
+            
+            if(roomsAffected > 0) {
+                return `已清除 ${roomsAffected} 个房间的所有终端任务 (共 ${clearedCount} 个任务)`;
+            } else {
+                return `没有找到任何房间的终端任务需要清除`;
+            }
+        }
+    },
+    
+    /**
+     * 清除房间内所有terminal hauler的任务记忆
+     * @param {Room} room - 房间对象
+     */
+    clearCreepTaskMemory: function(room) {
+        const creeps = room.find(FIND_MY_CREEPS, {
+            filter: (creep) => creep.memory.role === 'terminalHauler'
+        });
+        
+        for(const creep of creeps) {
+            if(creep.memory.taskId) {
+                delete creep.memory.taskId;
+                delete creep.memory.taskType;
+                delete creep.memory.taskResource;
+                delete creep.memory.taskAmount;
+                delete creep.memory.taskFrom;
+                delete creep.memory.taskTo;
+                creep.say('🚫');
+            }
+        }
     }
 };
 

@@ -130,6 +130,11 @@ global.disableKMineralTrading = function(roomName) {
     return _managers.terminal.disableKMineralTrading(roomName);
 };
 
+// 添加清除终端任务的全局函数
+global.clearTerminalTasks = function(roomName) {
+    return _managers.terminal.clearAllTerminalTasks(roomName);
+};
+
 // 添加从终端转移资源到Storage的函数
 global.transferFromTerminal = function(roomName, resourceType = RESOURCE_ENERGY, amount = 0) {
     const room = Game.rooms[roomName];
@@ -299,6 +304,24 @@ global.disableTerminalEnergyMaintenance = function(roomName) {
 
 // 添加手动生成远程运输者的函数，用于从指定房间的STORAGE搬运能量
 global.spawnStorageHauler = function(sourceRoomName, targetRoomName, count = 1, priority = 2) {
+    // 警告用户使用新的API
+    console.log(`警告: spawnStorageHauler函数已弃用，请使用setStorageHaulers函数代替。正在使用新API执行请求。`);
+    
+    // 调用新的API
+    return setStorageHaulers(sourceRoomName, targetRoomName, count, priority);
+};
+
+// 添加启用或更新Storage Hauler的函数
+global.enableStorageHauler = function(sourceRoomName, targetRoomName, count = 1, priority = 2) {
+    // 警告用户使用新的API
+    console.log(`警告: enableStorageHauler函数已弃用，请使用setStorageHaulers函数代替。正在使用新API执行请求。`);
+    
+    // 调用新的API
+    return setStorageHaulers(sourceRoomName, targetRoomName, count, priority);
+};
+
+// 设置Storage Haulers的新函数
+global.setStorageHaulers = function(sourceRoomName, targetRoomName, count = 1, priority = 2) {
     // 检查源房间是否存在
     const sourceRoom = Game.rooms[sourceRoomName];
     if(!sourceRoom) {
@@ -311,33 +334,521 @@ global.spawnStorageHauler = function(sourceRoomName, targetRoomName, count = 1, 
         return `错误：源房间 ${sourceRoomName} 没有可用的生成点`;
     }
     
+    // 初始化房间的storageHaulers结构
+    if(!sourceRoom.memory.storageHaulers) {
+        sourceRoom.memory.storageHaulers = {};
+    }
+    
+    // 更新配置
+    sourceRoom.memory.storageHaulers[targetRoomName] = {
+        count: count,
+        priority: priority
+    };
+    
+    // 确保creepConfigs中的设置也更新
+    if(!Memory.creepConfigs) Memory.creepConfigs = {};
+    if(!Memory.creepConfigs.remoteHauler) Memory.creepConfigs.remoteHauler = {};
+    if(!Memory.creepConfigs.remoteHauler[sourceRoomName]) Memory.creepConfigs.remoteHauler[sourceRoomName] = {};
+    
+    // 设置creepConfigs
+    Memory.creepConfigs.remoteHauler[sourceRoomName] = {
+        targetRoom: targetRoomName,
+        storageHauler: true,
+        priority: priority
+    };
+    
+    console.log(`Storage Hauler配置已更新：从 ${sourceRoomName} 到 ${targetRoomName}，数量：${count}，优先级：${priority}`);
+    
+    return `已设置 ${sourceRoomName} 房间派遣 ${count} 个存储运输者至 ${targetRoomName}`;
+};
+
+// 添加禁用Storage Hauler的函数
+global.disableStorageHaulers = function(sourceRoomName, targetRoomName) {
+    // 检查源房间是否存在
+    const sourceRoom = Game.rooms[sourceRoomName];
+    if(!sourceRoom) {
+        return `错误：无法访问源房间 ${sourceRoomName}`;
+    }
+    
+    // 检查配置是否存在
+    if(!sourceRoom.memory.storageHaulers || !sourceRoom.memory.storageHaulers[targetRoomName]) {
+        return `错误：未找到从 ${sourceRoomName} 到 ${targetRoomName} 的Storage Hauler配置`;
+    }
+    
+    // 删除配置
+    delete sourceRoom.memory.storageHaulers[targetRoomName];
+    
+    // 如果没有其他配置，删除整个结构
+    if(Object.keys(sourceRoom.memory.storageHaulers).length === 0) {
+        delete sourceRoom.memory.storageHaulers;
+    }
+    
+    console.log(`已禁用从 ${sourceRoomName} 到 ${targetRoomName} 的Storage Hauler`);
+    
+    return `Storage Hauler配置已禁用`;
+};
+
+// 获取所有Storage Hauler配置的函数
+global.getStorageHaulersStatus = function() {
+    let status = `Storage Hauler配置状态：\n`;
+    let hasConfigs = false;
+    
+    // 遍历所有可见房间
+    for(const roomName in Game.rooms) {
+        const room = Game.rooms[roomName];
+        
+        // 跳过不是我们控制的房间
+        if(!room.controller || !room.controller.my) continue;
+        
+        // 检查房间是否有Storage Hauler配置
+        if(room.memory.storageHaulers) {
+            for(const targetRoomName in room.memory.storageHaulers) {
+                const config = room.memory.storageHaulers[targetRoomName];
+                hasConfigs = true;
+                
+                // 计算当前活跃的haulers数量
+                const currentCount = _.filter(Game.creeps, creep => 
+                    creep.memory.role === 'remoteHauler' && 
+                    creep.memory.storageHauler === true &&
+                    creep.memory.homeRoom === roomName &&
+                    creep.memory.targetRoom === targetRoomName
+                ).length;
+                
+                status += `源房间：${roomName}，目标房间：${targetRoomName}，配置数量：${config.count}，当前数量：${currentCount}，优先级：${config.priority}\n`;
+            }
+        }
+    }
+    
+    if(!hasConfigs) {
+        return `当前没有Storage Hauler配置`;
+    }
+    
+    return status;
+};
+
+// 添加清除生成队列的函数
+global.clearSpawnQueue = function(roomName, role) {
+    // 如果不存在生成队列，直接返回
+    if(!Memory.spawnQueue) {
+        return `没有找到任何生成队列`;
+    }
+    
+    // 如果提供了特定房间
+    if(roomName) {
+        // 检查该房间是否有生成队列
+        if(!Memory.spawnQueue[roomName] || Memory.spawnQueue[roomName].length === 0) {
+            return `房间 ${roomName} 没有待处理的生成队列`;
+        }
+        
+        // 如果同时提供了角色，只清除该角色的队列项目
+        if(role) {
+            const originalLength = Memory.spawnQueue[roomName].length;
+            Memory.spawnQueue[roomName] = Memory.spawnQueue[roomName].filter(item => 
+                item.role !== role
+            );
+            
+            const removedCount = originalLength - Memory.spawnQueue[roomName].length;
+            
+            // 如果清除后队列为空，删除整个队列对象
+            if(Memory.spawnQueue[roomName].length === 0) {
+                delete Memory.spawnQueue[roomName];
+            }
+            
+            return `已从房间 ${roomName} 的生成队列中移除 ${removedCount} 个 ${role} 角色项目`;
+        }
+        // 如果没有提供角色，清除整个房间的队列
+        else {
+            const count = Memory.spawnQueue[roomName].length;
+            delete Memory.spawnQueue[roomName];
+            return `已清除房间 ${roomName} 的全部生成队列，共 ${count} 个项目`;
+        }
+    }
+    // 如果没有提供特定房间，但提供了角色，清除所有房间中该角色的队列项目
+    else if(role) {
+        let totalRemoved = 0;
+        
+        for(const roomName in Memory.spawnQueue) {
+            const originalLength = Memory.spawnQueue[roomName].length;
+            
+            Memory.spawnQueue[roomName] = Memory.spawnQueue[roomName].filter(item => 
+                item.role !== role
+            );
+            
+            const removedCount = originalLength - Memory.spawnQueue[roomName].length;
+            totalRemoved += removedCount;
+            
+            // 如果清除后队列为空，删除该房间的队列对象
+            if(Memory.spawnQueue[roomName].length === 0) {
+                delete Memory.spawnQueue[roomName];
+            }
+        }
+        
+        return `已从所有房间的生成队列中移除 ${totalRemoved} 个 ${role} 角色项目`;
+    }
+    // 如果没有提供房间和角色，清除所有生成队列
+    else {
+        let totalCount = 0;
+        for(const roomName in Memory.spawnQueue) {
+            totalCount += Memory.spawnQueue[roomName].length;
+        }
+        
+        Memory.spawnQueue = {};
+        
+        return `已清除所有房间的生成队列，共 ${totalCount} 个项目`;
+    }
+};
+
+// 添加查看当前生成队列的函数
+global.getSpawnQueue = function(roomName) {
+    // 如果不存在生成队列，直接返回
+    if(!Memory.spawnQueue) {
+        return `没有找到任何生成队列`;
+    }
+    
+    // 如果提供了特定房间
+    if(roomName) {
+        // 检查该房间是否有生成队列
+        if(!Memory.spawnQueue[roomName] || Memory.spawnQueue[roomName].length === 0) {
+            return `房间 ${roomName} 没有待处理的生成队列`;
+        }
+        
+        // 生成详细信息
+        let queueInfo = `房间 ${roomName} 的生成队列 (${Memory.spawnQueue[roomName].length} 个):\n`;
+        
+        // 按优先级排序
+        const sortedQueue = [...Memory.spawnQueue[roomName]].sort((a, b) => a.priority - b.priority);
+        
+        for(let i = 0; i < sortedQueue.length; i++) {
+            const item = sortedQueue[i];
+            queueInfo += `${i+1}. 角色: ${item.role}, 优先级: ${item.priority}`;
+            
+            // 添加目标房间信息（如果有）
+            if(item.memory && item.memory.targetRoom) {
+                queueInfo += `, 目标房间: ${item.memory.targetRoom}`;
+                
+                // 添加Storage Hauler标记（如果有）
+                if(item.memory.storageHauler) {
+                    queueInfo += ` [存储运输]`;
+                }
+            }
+            
+            queueInfo += '\n';
+        }
+        
+        return queueInfo;
+    }
+    // 如果没有提供房间，显示所有房间的队列概况
+    else {
+        let totalCount = 0;
+        let queueInfo = `所有房间的生成队列概况:\n`;
+        
+        for(const roomName in Memory.spawnQueue) {
+            const queueLength = Memory.spawnQueue[roomName].length;
+            totalCount += queueLength;
+            
+            if(queueLength > 0) {
+                const roleCount = {};
+                
+                // 统计各角色数量
+                for(const item of Memory.spawnQueue[roomName]) {
+                    roleCount[item.role] = (roleCount[item.role] || 0) + 1;
+                }
+                
+                // 生成角色统计信息
+                let roleInfo = '';
+                for(const role in roleCount) {
+                    roleInfo += `${role}: ${roleCount[role]}, `;
+                }
+                roleInfo = roleInfo.slice(0, -2); // 移除最后的逗号和空格
+                
+                queueInfo += `- 房间 ${roomName}: ${queueLength} 个 (${roleInfo})\n`;
+            }
+        }
+        
+        if(totalCount === 0) {
+            return `没有找到任何待处理的生成队列`;
+        }
+        
+        queueInfo += `总计: ${totalCount} 个待生成Creep`;
+        return queueInfo;
+    }
+};
+
+// 添加手动生成Hauler的函数
+global.spawnHauler = function(roomName, count = 1, priority = 2) {
+    // 检查房间是否存在
+    const room = Game.rooms[roomName];
+    if(!room) {
+        return `错误：无法访问房间 ${roomName}`;
+    }
+    
+    // 检查房间是否有生成点
+    const spawns = room.find(FIND_MY_SPAWNS);
+    if(spawns.length === 0) {
+        return `错误：房间 ${roomName} 没有可用的生成点`;
+    }
+    
     // 确保有生成队列
     if(!Memory.spawnQueue) {
         Memory.spawnQueue = {};
     }
     
-    if(!Memory.spawnQueue[sourceRoomName]) {
-        Memory.spawnQueue[sourceRoomName] = [];
+    if(!Memory.spawnQueue[roomName]) {
+        Memory.spawnQueue[roomName] = [];
     }
     
-    // 生成指定数量的远程运输者
+    // 生成指定数量的Hauler
     for(let i = 0; i < count; i++) {
         // 添加到生成队列
-        Memory.spawnQueue[sourceRoomName].push({
-            role: 'remoteHauler',
+        Memory.spawnQueue[roomName].push({
+            role: 'hauler',
             priority: priority,
             memory: {
-                role: 'remoteHauler',
-                homeRoom: sourceRoomName,   // 主房间（运输目标）
-                targetRoom: targetRoomName, // 目标房间（能量来源）
-                working: false,
-                waiting: false,
-                storageHauler: true         // 标记这是专门从Storage搬运的运输者
+                role: 'hauler',
+                homeRoom: roomName,
+                working: false
             }
         });
     }
     
-    return `已添加${count}个从 ${targetRoomName} 的Storage向 ${sourceRoomName} 运输能量的远程运输者任务`;
+    console.log(`已添加 ${count} 个Hauler到 ${roomName} 的生成队列`);
+    return `已将 ${count} 个Hauler添加到房间 ${roomName} 的生成队列，优先级: ${priority}`;
+};
+
+// 添加手动生成Miner的函数
+global.spawnMiner = function(roomName, count = 1, priority = 1) {
+    // 检查房间是否存在
+    const room = Game.rooms[roomName];
+    if(!room) {
+        return `错误：无法访问房间 ${roomName}`;
+    }
+    
+    // 检查房间是否有生成点
+    const spawns = room.find(FIND_MY_SPAWNS);
+    if(spawns.length === 0) {
+        return `错误：房间 ${roomName} 没有可用的生成点`;
+    }
+    
+    // 确保有生成队列
+    if(!Memory.spawnQueue) {
+        Memory.spawnQueue = {};
+    }
+    
+    if(!Memory.spawnQueue[roomName]) {
+        Memory.spawnQueue[roomName] = [];
+    }
+    
+    // 生成指定数量的Miner
+    for(let i = 0; i < count; i++) {
+        // 添加到生成队列
+        Memory.spawnQueue[roomName].push({
+            role: 'miner',
+            priority: priority,
+            memory: {
+                role: 'miner',
+                homeRoom: roomName,
+                working: false,
+                dontPullMe: true  // 矿工不被对穿
+            }
+        });
+    }
+    
+    console.log(`已添加 ${count} 个Miner到 ${roomName} 的生成队列`);
+    return `已将 ${count} 个Miner添加到房间 ${roomName} 的生成队列，优先级: ${priority}`;
+};
+
+// 添加手动生成Upgrader的函数
+global.spawnUpgrader = function(roomName, count = 1, priority = 3) {
+    // 检查房间是否存在
+    const room = Game.rooms[roomName];
+    if(!room) {
+        return `错误：无法访问房间 ${roomName}`;
+    }
+    
+    // 检查房间是否有生成点
+    const spawns = room.find(FIND_MY_SPAWNS);
+    if(spawns.length === 0) {
+        return `错误：房间 ${roomName} 没有可用的生成点`;
+    }
+    
+    // 确保有生成队列
+    if(!Memory.spawnQueue) {
+        Memory.spawnQueue = {};
+    }
+    
+    if(!Memory.spawnQueue[roomName]) {
+        Memory.spawnQueue[roomName] = [];
+    }
+    
+    // 生成指定数量的Upgrader
+    for(let i = 0; i < count; i++) {
+        // 添加到生成队列
+        Memory.spawnQueue[roomName].push({
+            role: 'upgrader',
+            priority: priority,
+            memory: {
+                role: 'upgrader',
+                homeRoom: roomName,
+                working: false,
+                dontPullMe: true  // 升级者不被对穿
+            }
+        });
+    }
+    
+    console.log(`已添加 ${count} 个Upgrader到 ${roomName} 的生成队列`);
+    return `已将 ${count} 个Upgrader添加到房间 ${roomName} 的生成队列，优先级: ${priority}`;
+};
+
+// 添加手动生成Builder的函数
+global.spawnBuilder = function(roomName, count = 1, priority = 4) {
+    // 检查房间是否存在
+    const room = Game.rooms[roomName];
+    if(!room) {
+        return `错误：无法访问房间 ${roomName}`;
+    }
+    
+    // 检查房间是否有生成点
+    const spawns = room.find(FIND_MY_SPAWNS);
+    if(spawns.length === 0) {
+        return `错误：房间 ${roomName} 没有可用的生成点`;
+    }
+    
+    // 确保有生成队列
+    if(!Memory.spawnQueue) {
+        Memory.spawnQueue = {};
+    }
+    
+    if(!Memory.spawnQueue[roomName]) {
+        Memory.spawnQueue[roomName] = [];
+    }
+    
+    // 生成指定数量的Builder
+    for(let i = 0; i < count; i++) {
+        // 添加到生成队列
+        Memory.spawnQueue[roomName].push({
+            role: 'builder',
+            priority: priority,
+            memory: {
+                role: 'builder',
+                homeRoom: roomName,
+                working: false,
+                dontPullMe: true  // 建造者不被对穿
+            }
+        });
+    }
+    
+    console.log(`已添加 ${count} 个Builder到 ${roomName} 的生成队列`);
+    return `已将 ${count} 个Builder添加到房间 ${roomName} 的生成队列，优先级: ${priority}`;
+};
+
+// 添加手动生成Repairer的函数
+global.spawnRepairer = function(roomName, count = 1, priority = 5) {
+    // 检查房间是否存在
+    const room = Game.rooms[roomName];
+    if(!room) {
+        return `错误：无法访问房间 ${roomName}`;
+    }
+    
+    // 检查房间是否有生成点
+    const spawns = room.find(FIND_MY_SPAWNS);
+    if(spawns.length === 0) {
+        return `错误：房间 ${roomName} 没有可用的生成点`;
+    }
+    
+    // 确保有生成队列
+    if(!Memory.spawnQueue) {
+        Memory.spawnQueue = {};
+    }
+    
+    if(!Memory.spawnQueue[roomName]) {
+        Memory.spawnQueue[roomName] = [];
+    }
+    
+    // 生成指定数量的Repairer
+    for(let i = 0; i < count; i++) {
+        // 添加到生成队列
+        Memory.spawnQueue[roomName].push({
+            role: 'repairer',
+            priority: priority,
+            memory: {
+                role: 'repairer',
+                homeRoom: roomName,
+                working: false
+            }
+        });
+    }
+    
+    console.log(`已添加 ${count} 个Repairer到 ${roomName} 的生成队列`);
+    return `已将 ${count} 个Repairer添加到房间 ${roomName} 的生成队列，优先级: ${priority}`;
+};
+
+// 添加手动生成WallRepairer的函数
+global.spawnWallRepairer = function(roomName, count = 1, priority = 6) {
+    // 检查房间是否存在
+    const room = Game.rooms[roomName];
+    if(!room) {
+        return `错误：无法访问房间 ${roomName}`;
+    }
+    
+    // 检查房间是否有生成点
+    const spawns = room.find(FIND_MY_SPAWNS);
+    if(spawns.length === 0) {
+        return `错误：房间 ${roomName} 没有可用的生成点`;
+    }
+    
+    // 确保有生成队列
+    if(!Memory.spawnQueue) {
+        Memory.spawnQueue = {};
+    }
+    
+    if(!Memory.spawnQueue[roomName]) {
+        Memory.spawnQueue[roomName] = [];
+    }
+    
+    // 生成指定数量的WallRepairer
+    for(let i = 0; i < count; i++) {
+        // 添加到生成队列
+        Memory.spawnQueue[roomName].push({
+            role: 'wallRepairer',
+            priority: priority,
+            memory: {
+                role: 'wallRepairer',
+                homeRoom: roomName,
+                working: false
+            }
+        });
+    }
+    
+    console.log(`已添加 ${count} 个WallRepairer到 ${roomName} 的生成队列`);
+    return `已将 ${count} 个WallRepairer添加到房间 ${roomName} 的生成队列，优先级: ${priority}`;
+};
+
+// 添加显示所有生成命令帮助的函数
+global.spawnHelp = function() {
+    return `可用的生成命令：
+
+基础角色：
+  spawnHauler(房间名, 数量=1, 优先级=2)         - 生成运输者
+  spawnMiner(房间名, 数量=1, 优先级=1)          - 生成矿工
+  spawnUpgrader(房间名, 数量=1, 优先级=3)       - 生成升级者
+  spawnBuilder(房间名, 数量=1, 优先级=4)        - 生成建造者
+  spawnRepairer(房间名, 数量=1, 优先级=5)       - 生成修理者
+  spawnWallRepairer(房间名, 数量=1, 优先级=6)   - 生成墙体修理者
+
+特殊角色：
+  spawnDefender(出生房间, 目标房间, 优先级=1)   - 生成防御者
+  spawnRemoteBuilder(出生房间, 目标房间, 数量=2, 优先级=2) - 生成远程建造者
+  setStorageHaulers(出生房间, 目标房间, 数量=1, 优先级=2)  - 设置存储运输者
+  
+管理命令：
+  getSpawnQueue(房间名)           - 查看生成队列
+  clearSpawnQueue(房间名, 角色名) - 清除生成队列
+
+示例:
+  spawnHauler('W1N1', 2)        - 在W1N1生成2个运输者
+  spawnMiner('W1N1')            - 在W1N1生成1个矿工
+  spawnDefender('W1N1', 'W2N2') - 从W1N1生成防御者去W2N2防御
+`;
 };
 
 // 添加查找资源最优价格的函数

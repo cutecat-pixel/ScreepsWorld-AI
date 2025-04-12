@@ -66,6 +66,10 @@
 
 本系统提供了完善的市场交易功能，可以方便地进行资源交易和管理：
 
+```javascript
+清除指定房间的所有终端任务: clearTerminalTasks("W1N1")
+清除所有房间的终端任务: clearTerminalTasks()
+```
 ### 自动K矿物交易
 
 K矿物自动交易系统会监控市场上的K矿物订单，并自动完成交易：
@@ -162,6 +166,15 @@ buyResourceFromMarket('房间名', RESOURCE_KEANIUM, 2000, 0.6); // 购买2000 K
 // 生成远程运输者，从目标房间的Storage搬运能量到源房间
 // 参数：源房间名(目的地)，目标房间名(能量来源)，运输者数量，优先级
 spawnStorageHauler('W8N3', 'W7N3', 2, 2);
+
+// 启用两个从W7N3到W8N3的Storage Hauler，优先级为2
+enableStorageHauler('W8N3', 'W7N3', 2, 2);
+   
+// 查看当前所有Storage Hauler的状态
+getStorageHaulerStatus();
+   
+// 禁用从W7N3到W8N3的Storage Hauler
+disableStorageHauler('W8N3', 'W7N3');
 ```
 
 这将创建专门的远程运输者，它们会前往指定的目标房间，从那里的Storage中获取能量，然后将能量带回主房间并存入Storage。此功能非常适合从已占领但尚未完全开发的房间或从盟友房间运输能量。

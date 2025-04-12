@@ -127,12 +127,17 @@ const creepManager = {
             memory.dontPullMe = true;
         }
         
+        // 对于存储运输者设置storageHauler标记
+        if(role === 'remoteHauler' && config.storageHauler) {
+            memory.storageHauler = true;
+        }
+        
         // 尝试生成新的creep
         const result = spawn.spawnCreep(body, newName, { memory });
         
         // 如果成功生成，输出通知
         if(result === OK) {
-            console.log(`${room.name} 正在生成新的 ${role}: ${newName} 目标房间: ${config.targetRoom}`);
+            console.log(`${room.name} 正在生成新的 ${role}: ${newName} 目标房间: ${config.targetRoom}${memory.storageHauler ? ' [存储运输]' : ''}`);
         }
     },
     
@@ -248,7 +253,7 @@ const creepManager = {
      */
     getCreepPriorityOrder: function(room, gameStage) {
         // 基本优先级顺序
-        let priorityOrder = ['harvester', 'upgrader', 'builder', 'repairer', 'miner', 'hauler', 'defender', 'wallRepairer', 'claimer', 'dismantler', 'remoteMiner', 'remoteHauler', 'transfer', 'signer', 'remoteBuilder', 'mineralHarvester', 'mineralHauler', 'terminalHauler'];
+        let priorityOrder = ['hauler', 'miner', 'harvester', 'upgrader', 'defender', 'builder', 'repairer', 'wallRepairer', 'claimer', 'dismantler', 'remoteMiner', 'remoteHauler', 'transfer', 'signer', 'remoteBuilder', 'mineralHarvester', 'mineralHauler', 'terminalHauler'];
         
         // 紧急情况的优先级调整
         
@@ -314,7 +319,7 @@ const creepManager = {
         // 根据游戏阶段调整优先级
         if(gameStage.level >= 4) {
             // 高级阶段，矿工、运输者和转运者的优先级提高
-            priorityOrder = ['harvester', 'miner', 'hauler', 'transfer', 'upgrader', 'builder', 'repairer', 'defender', 'wallRepairer', 'mineralHarvester', 'mineralHauler', 'terminalHauler', 'claimer', 'dismantler', 'remoteMiner', 'remoteHauler'];
+            priorityOrder = ['hauler', 'miner', 'harvester', 'transfer', 'upgrader', 'builder', 'repairer', 'defender', 'wallRepairer', 'mineralHarvester', 'mineralHauler', 'terminalHauler', 'claimer', 'dismantler', 'remoteMiner', 'remoteHauler'];
         }
         else if(gameStage.level >= 3) {
             // 中期阶段，矿工和运输者的优先级提高
