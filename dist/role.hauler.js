@@ -226,6 +226,39 @@ const roleHauler = {
                 }
             }
             
+            // 检查PowerSpawn是否需要能量，优先级在塔之后，但在储能LINK之前
+            if(targets.length === 0) {
+                const powerSpawns = creep.room.find(FIND_MY_STRUCTURES, {
+                    filter: s => s.structureType === STRUCTURE_POWER_SPAWN && 
+                              s.store.getFreeCapacity(RESOURCE_ENERGY) > 0 &&
+                              s.store.getUsedCapacity(RESOURCE_ENERGY) < 2000 // 确保PowerSpawn至少有2000能量用于处理Power
+                });
+                
+                if(powerSpawns.length > 0) {
+                    // 检查是否有其他hauler正在前往PowerSpawn
+                    const filteredPowerSpawns = _.filter(powerSpawns, ps => {
+                        for(let id in Game.creeps) {
+                            const otherCreep = Game.creeps[id];
+                            if(otherCreep.id !== creep.id && 
+                               otherCreep.memory.role === 'hauler' && 
+                               otherCreep.memory.targetId === ps.id) {
+                                return false;
+                            }
+                        }
+                        return true;
+                    });
+                    
+                    if(filteredPowerSpawns.length > 0) {
+                        // 按能量量排序，选择能量最少的PowerSpawn
+                        filteredPowerSpawns.sort((a, b) => 
+                            a.store.getUsedCapacity(RESOURCE_ENERGY) - b.store.getUsedCapacity(RESOURCE_ENERGY)
+                        );
+                        targets = [filteredPowerSpawns[0]];
+                        creep.say('⚡ 送能量');
+                    }
+                }
+            }
+            
             // 检查与STORAGE相邻的LINK是否需要能量
             if(targets.length === 0 && creep.room.memory.links && creep.room.memory.links.storage) {
                 const storageLink = Game.getObjectById(creep.room.memory.links.storage);

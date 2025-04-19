@@ -7,5 +7,7 @@ module.exports = {
     invasion: require('manager.invasion'),
     link: require('manager.link'),
     movement: require('manager.movement'),
-    terminal: require('manager.terminal')
+    terminal: require('manager.terminal'),
+    powerCreep: require('manager.powerCreep'),
+    powerSpawn: require('manager.powerSpawn')
 }; 

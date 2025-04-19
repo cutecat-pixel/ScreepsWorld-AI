@@ -52,7 +52,7 @@ const utils = {
      */
     findEnergySource: function(creep) {
 
-        if (creep.room.controller.level >= 5) {
+        if (creep.room.controller.level >= 4) {
             const storage = creep.pos.findClosestByPath(FIND_STRUCTURES, {
                 filter: s => s.structureType === STRUCTURE_STORAGE && 
                             s.store[RESOURCE_ENERGY] > 0

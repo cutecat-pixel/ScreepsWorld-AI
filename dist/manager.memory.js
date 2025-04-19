@@ -4,6 +4,13 @@
  */
 const memoryManager = {
     /**
+     * 内存管理器主方法，在主循环中调用
+     */
+    run: function() {
+        this.cleanupMemory();
+    },
+
+    /**
      * 清理不存在的creeps的内存
      */
     cleanupMemory: function() {

@@ -17,5 +17,6 @@ module.exports = {
     remoteBuilder: require('role.remoteBuilder'),
     mineralHarvester: require('role.mineralHarvester'),
     mineralHauler: require('role.mineralHauler'),
-    terminalHauler: require('role.terminalHauler')
+    terminalHauler: require('role.terminalHauler'),
+    powerHauler: require('role.powerHauler')
 }; 
