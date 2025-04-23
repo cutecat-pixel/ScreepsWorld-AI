@@ -9,5 +9,6 @@ module.exports = {
     movement: require('manager.movement'),
     terminal: require('manager.terminal'),
     powerCreep: require('manager.powerCreep'),
-    powerSpawn: require('manager.powerSpawn')
+    powerSpawn: require('manager.powerSpawn'),
+    lab: require('manager.lab')
 }; 

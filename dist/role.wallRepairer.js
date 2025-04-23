@@ -12,18 +12,16 @@ const roleWallRepairer = {
      * @returns {Array} - 身体部件数组
      */
     getBody: function(energyAvailable, gameStage) {
-        // 墙壁修复者只需要CARRY和MOVE部件
-        let body = [WORK, WORK, CARRY, CARRY, MOVE, MOVE, MOVE];
-        
-        // 中等能量配置
-        if(energyAvailable >= 700 && gameStage >= 3) {
-            body = [WORK, WORK, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE];
-        }
-        
+
+        let body = [WORK, WORK, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE];
         // 高能量配置
-        if(energyAvailable >= 1200 && gameStage >= 4) {
+        if(energyAvailable >= 1200 && gameStage.level >= 4) {
             body = [WORK, WORK, WORK, WORK, CARRY, CARRY, CARRY, CARRY, CARRY,
                     MOVE, MOVE, MOVE, MOVE, MOVE, MOVE];
+        }
+        // 中等能量配置
+        else if(energyAvailable >= 700 && gameStage.level >= 3) {
+            body = [WORK, WORK, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE];
         }
         
         return body;

@@ -8,7 +8,7 @@ module.exports = {
     hauler: require('role.hauler'),
     defender: require('role.defender'),
     claimer: require('role.claimer'),
-    dismantler: require('role.dismantler'),
+    // dismantler: require('role.dismantler'), // Old generic dismantler (if any)
     wallRepairer: require('role.wallRepairer'),
     remoteMiner: require('role.remoteMiner'),
     remoteHauler: require('role.remoteHauler'),
@@ -18,5 +18,7 @@ module.exports = {
     mineralHarvester: require('role.mineralHarvester'),
     mineralHauler: require('role.mineralHauler'),
     terminalHauler: require('role.terminalHauler'),
-    powerHauler: require('role.powerHauler')
+    powerHauler: require('role.powerHauler'),
+    labHauler: require('role.labHauler'),
+    dismantler: require('role.dismantler') // Add specific Dismantler role
 }; 

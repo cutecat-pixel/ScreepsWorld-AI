@@ -54,8 +54,8 @@ const roleDefender = {
                         creep.rangedMassAttack();
                     }
                     
-                    // 如果距离过近，保持距离
-                    if(range <= 1) {
+                    // 如果距离过近，保持距离 (仅当没有近战部件时)
+                    if(range <= 1 && this.countBodyParts(creep, ATTACK) === 0) {
                         // 尝试远离敌人
                         const fleePath = PathFinder.search(creep.pos, {
                             pos: target.pos,
@@ -68,7 +68,10 @@ const roleDefender = {
                         if(!fleePath.incomplete && fleePath.path.length > 0) {
                             creep.move(creep.pos.getDirectionTo(fleePath.path[0]));
                             creep.say('🏹');
-                            return;
+                            // return; // 注意：如果 flee, 可能需要 return 避免后续移动
+                        } else {
+                             // 如果无法flee, 但距离是1, 且只有远程, 也许应该稍微后退一步？
+                             // 或者保持不动攻击
                         }
                     }
                 }
@@ -80,42 +83,72 @@ const roleDefender = {
                 creep.say('⚔️');
             }
             
-            // 移动逻辑
-            // 如果有远程攻击能力，尝试保持在3格的最佳攻击距离
-            if(this.countBodyParts(creep, RANGED_ATTACK) > 0 && this.countBodyParts(creep, ATTACK) === 0) {
-                // 仅有远程攻击，保持在3格距离
-                if(range < 3) {
-                    // 离目标太近，后退
-                    const fleePath = PathFinder.search(creep.pos, {
-                        pos: target.pos,
-                        range: 3
-                    }, {
-                        flee: true,
-                        maxRooms: 1
-                    });
-                    
-                    if(!fleePath.incomplete && fleePath.path.length > 0) {
-                        creep.move(creep.pos.getDirectionTo(fleePath.path[0]));
-                    }
-                } else if(range > 3) {
+            // 移动逻辑 (需要根据是否有近/远程调整)
+            if (creep.memory._move && creep.memory._move.dest && creep.memory._move.dest.id === target.id) {
+                // 如果已经在向目标移动，不需要再次调用 moveTo
+            } else if (this.countBodyParts(creep, ATTACK) > 0) {
+                // 如果有近战能力，优先接近
+                creep.moveTo(target, {
+                    visualizePathStyle: {stroke: '#ff0000'},
+                    reusePath: 0, // 追击敌人时不需要复用旧路径
+                    ignoreCreeps: false // 不要忽略其他creep，避免撞车
+                });
+            } else if(this.countBodyParts(creep, RANGED_ATTACK) > 0) {
+                // 仅有远程攻击，尝试保持在3格距离
+                if(range > 3) {
                     // 离目标太远，接近
                     creep.moveTo(target, {
                         visualizePathStyle: {stroke: '#ff0000'},
                         reusePath: 0,
-                        range: 3
+                        range: 3,
+                        ignoreCreeps: false
                     });
+                } else if (range < 3) {
+                     // 距离太近，尝试后退 (flee 逻辑已在 rangedAttack 部分处理，这里可以省略或作为备用)
+                     // 保持不动也可以接受，让 rangedAttack 处理
                 }
             } else {
-                // 如果有近战能力或没有远程能力，直接接近敌人
+                 // 没有攻击能力？也向目标移动
                 creep.moveTo(target, {
-                    visualizePathStyle: {stroke: '#ff0000'},
-                    reusePath: 0
+                    visualizePathStyle: {stroke: '#cccccc'},
+                    reusePath: 5
                 });
             }
         }
-        // 没有敌人时巡逻
+        // --- 如果没有敌对 Creep，检查 Invader Core --- 
         else {
-            this.patrolRoom(creep);
+            const invaderCore = creep.room.find(FIND_HOSTILE_STRUCTURES, {
+                filter: { structureType: STRUCTURE_INVADER_CORE }
+            })[0]; // 通常只有一个
+
+            if (invaderCore) {
+                creep.say('💥 Core');
+                // 检查是否有 ATTACK 部件
+                if (this.countBodyParts(creep, ATTACK) > 0) {
+                    // 移动到 Invader Core 旁边并攻击
+                    if (creep.attack(invaderCore) === ERR_NOT_IN_RANGE) {
+                        creep.moveTo(invaderCore, {
+                            visualizePathStyle: { stroke: '#ff0000' },
+                            reusePath: 5 // 目标固定，可以适当复用路径
+                        });
+                    }
+                } else {
+                    // 如果没有近战攻击部件，Defender 无法有效攻击 Core
+                    // 可以选择待命或移动到 Core 附近标记它？
+                    // 简单起见，先让它移动到 Core 附近
+                    if (!creep.pos.isNearTo(invaderCore)) {
+                         creep.moveTo(invaderCore, {
+                             visualizePathStyle: { stroke: '#cccccc' },
+                             reusePath: 5
+                         });
+                    }
+                    creep.say('❓ATTACK?')
+                }
+            }
+            // --- 如果没有敌人且没有 Invader Core，执行巡逻 --- 
+            else {
+                this.patrolRoom(creep);
+            }
         }
     },
     
@@ -211,10 +244,10 @@ const roleDefender = {
         if(gameStage.level >= 3 && energy >= 1700) {
             // 高级阶段配置，多功能防御者（远程攻击和治疗能力）
             body = [
-                TOUGH, TOUGH, 
+                TOUGH, TOUGH, ATTACK,
                 RANGED_ATTACK, RANGED_ATTACK, 
                 RANGED_ATTACK, 
-                MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, 
+                MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE,
                 HEAL, HEAL
             ];
         }

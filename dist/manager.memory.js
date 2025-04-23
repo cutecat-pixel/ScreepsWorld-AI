@@ -17,6 +17,31 @@ const memoryManager = {
         // 清理已经不存在的creeps内存
         for(let name in Memory.creeps) {
             if(!Game.creeps[name]) {
+                // 获取死去的 creep 内存
+                const creepMemory = Memory.creeps[name]; 
+                
+                // --- 新增：清理 Transfer 占用的 Container ---
+                if (creepMemory.role === 'transfer') {
+                    // 清理分配的 Container ID
+                    if (creepMemory.assignedContainerId) {
+                        const homeRoomName = creepMemory.homeRoom;
+                        const containerIdToRemove = creepMemory.assignedContainerId;
+                        if (homeRoomName && Memory.rooms[homeRoomName] && Memory.rooms[homeRoomName].assignedContainers) {
+                            console.log(`清理内存：正在从房间 ${homeRoomName} 释放死去的 Transfer (${name}) 占用的 Container ${containerIdToRemove}`);
+                            _.remove(Memory.rooms[homeRoomName].assignedContainers, id => id === containerIdToRemove);
+                        } else {
+                            console.log(`警告：无法为死去的 Transfer (${name}) 释放 Container ${containerIdToRemove}，房间内存 (${homeRoomName}) 或 assignedContainers 数组不存在。`);
+                        }
+                    }
+                    // 清理正在帮助的 Container ID 标记 (不需要从房间内存移除，因为它只是creep自己的标记)
+                    if (creepMemory.helpingContainerId) {
+                        console.log(`清理内存：清除死去的 Transfer (${name}) 的 helpingContainerId (${creepMemory.helpingContainerId}) 标记`);
+                        // 注意：这里不需要修改 room.memory.assignedContainers，因为 helpingContainerId 只是一个临时目标
+                    }
+                }
+                // --- 清理逻辑结束 ---
+                
+                // 删除 creep 内存
                 delete Memory.creeps[name];
                 console.log('清理不存在的creep内存:', name);
             }

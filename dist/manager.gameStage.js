@@ -373,11 +373,23 @@ function getCreepCountsByRole(room, gameStage) {
         }
     }
     
-    // 6. 处理Storage Hauler的生成逻辑
-    if(!targetCounts.remoteHauler) targetCounts.remoteHauler = 0;
+    // 6. Lab Hauler 的生成逻辑 (新增)
+    if (gameStage.level >= 6 && room.find(FIND_MY_STRUCTURES, { filter: s => s.structureType === STRUCTURE_LAB }).length >= 3) {
+        // 检查是否有待处理的Lab任务
+        const hasLabTasks = room.memory.labTasks && room.memory.labTasks.length > 0;
+        
+        if (hasLabTasks) {
+            targetCounts.labHauler = 1; // 如果有任务，需要一个 Lab Hauler
+        } else {
+            targetCounts.labHauler = 0; // 没有任务则不需要
+        }
+    } else {
+        targetCounts.labHauler = 0; // 等级不够或Lab不足则不需要
+    }
     
-    // 如果房间内存中配置了Storage Haulers，添加到目标数量中
-    if(room.memory.storageHaulers) {
+    // 7. 处理Storage Hauler的生成逻辑
+    if(room.memory.remoteHaulerConfig) {
+        let totalStorageHaulers = 0;
         // 根据目标房间统计需要的运输者数量
         for(const targetRoomName in room.memory.storageHaulers) {
             // 确保这个房间对应的配置存在
@@ -386,7 +398,7 @@ function getCreepCountsByRole(room, gameStage) {
                 const count = room.memory.storageHaulers[targetRoomName].count || 0;
                 
                 // 添加到目标数量中
-                targetCounts.remoteHauler += count;
+                totalStorageHaulers += count;
                 
                 // 确保创建remoteHauler所需的配置
                 if(!Memory.creepConfigs) Memory.creepConfigs = {};
@@ -401,6 +413,7 @@ function getCreepCountsByRole(room, gameStage) {
                 };
             }
         }
+        targetCounts.remoteHauler = totalStorageHaulers;
     }
     
     return targetCounts;

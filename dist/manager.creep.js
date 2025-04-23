@@ -126,6 +126,14 @@ const creepManager = {
         if(role === 'remoteMiner') {
             memory.dontPullMe = true;
         }
+
+        if(role === 'dismantler') {
+            memory.dontPullMe = true;
+        }
+
+        if(role === 'remoteBuilder') {
+            memory.dontPullMe = true;
+        }
         
         // 对于存储运输者设置storageHauler标记
         if(role === 'remoteHauler' && config.storageHauler) {
@@ -187,7 +195,7 @@ const creepManager = {
         };
         
         // 对特定角色设置dontPullMe为true，防止被对穿
-        if(['miner', 'builder', 'upgrader', 'mineralHarvester'].includes(request.role) && !memory.dontPullMe) {
+        if(['miner', 'builder', 'upgrader', 'mineralHarvester', 'dismantler', 'remoteBuilder'].includes(request.role) && !memory.dontPullMe) {
             memory.dontPullMe = true;
         }
         
@@ -362,7 +370,7 @@ const creepManager = {
         };
         
         // 对特定角色设置dontPullMe为true，防止被对穿
-        if(['miner', 'builder', 'upgrader', 'mineralHarvester'].includes(role)) {
+        if(['miner', 'builder', 'upgrader', 'mineralHarvester', 'dismantler', 'remoteBuilder'].includes(role)) {
             memory.dontPullMe = true;
         }
         
@@ -389,7 +397,7 @@ const creepManager = {
             const role = creep.memory.role || 'harvester';
             
             // 为特定角色设置dontPullMe属性，防止被对穿
-            if(['miner', 'builder', 'upgrader', 'mineralHarvester'].includes(role) && !creep.memory.dontPullMe) {
+            if(['miner', 'builder', 'upgrader', 'mineralHarvester', 'dismantler', 'remoteBuilder'].includes(role) && !creep.memory.dontPullMe) {
                 creep.memory.dontPullMe = true;
             }
             

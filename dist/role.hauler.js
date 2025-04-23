@@ -1,5 +1,8 @@
 const utils = require('utils');
 
+const RENEW_THRESHOLD = 200; // 当 ticksToLive 低于此值时开始刷新
+const RENEW_UNTIL = 1400;    // 刷新到多少 ticksToLive 才停止
+
 /**
  * 运输者角色模块
  * 负责从STORAGE中获取能量，并将其运输到需要能量的结构中(SPAWN/EXTENSION/TOWER)和与STORAGE相邻的LINK
@@ -10,6 +13,7 @@ const roleHauler = {
      * @param {Creep} creep - 要控制的creep对象
      */
     run: function(creep) {
+        
         // 状态切换逻辑，带有自定义提示信息
         utils.switchWorkState(creep, '🔄 收集', '📦 运输');
         
@@ -117,12 +121,77 @@ const roleHauler = {
             }
             // 如果找不到能量源，移动到房间中心等待
             else {
-                creep.moveTo(new RoomPosition(22, 20, creep.room.name), {
-                    visualizePathStyle: {stroke: '#ffaa00'},
-                    range: 10
-                });
+                // creep.moveTo(new RoomPosition(22, 20, creep.room.name), {
+                //     visualizePathStyle: {stroke: '#ffaa00'},
+                //     range: 10
+                // });
             }
         }
+    },
+    
+    /**
+     * 处理 Creep 刷新逻辑
+     * @param {Creep} creep 
+     * @returns {boolean} 如果 Creep 正在或需要刷新，则返回 true
+     */
+    handleRenewal: function(creep) {
+        // 如果 Creep 正在被回收，则不刷新
+        if (creep.memory.recycling) {
+            return false;
+        }
+        
+        let isRenewing = creep.memory.renewing || false;
+        
+        // 检查是否应该开始刷新
+        if (!isRenewing && creep.ticksToLive < RENEW_THRESHOLD) {
+            // 查找最近的 Spawn
+            const spawn = creep.pos.findClosestByPath(FIND_MY_SPAWNS);
+            if (spawn) {
+                 isRenewing = true;
+                 creep.memory.renewing = true;
+                 delete creep.memory.targetId; // 清除当前目标，优先刷新
+                 delete creep.memory._move; // 清除移动缓存
+                 creep.say('⚕️ Renew');
+                 console.log(`${creep.name} (${creep.memory.role}) ticksToLive (${creep.ticksToLive}) 低于 ${RENEW_THRESHOLD}，开始前往 Spawn ${spawn.name} 刷新。`);
+            } else {
+                 // 找不到可用的 Spawn，放弃刷新
+                 console.log(`${creep.name} (${creep.memory.role}) 需要刷新，但找不到可用的 Spawn。`);
+                 return false; 
+            }
+        }
+        
+        // 如果正在刷新
+        if (isRenewing) {
+            // 检查是否已刷新完成
+            if (creep.ticksToLive >= RENEW_UNTIL) {
+                creep.memory.renewing = false;
+                creep.say('👍 Full');
+                console.log(`${creep.name} (${creep.memory.role}) 刷新完成 (ticksToLive: ${creep.ticksToLive})。`);
+                return false; // 刷新完成，继续正常逻辑
+            }
+            
+            // 查找最近的 Spawn (可能中途有更近的)
+            const spawn = creep.pos.findClosestByPath(FIND_MY_SPAWNS);
+            if (spawn) {
+                // 移动到 Spawn 旁边
+                if (!creep.pos.isNearTo(spawn)) {
+                    creep.moveTo(spawn, { visualizePathStyle: { stroke: '#00ff00' } });
+                } else {
+                    // 已经到达 Spawn 旁边，等待 Spawn 进行 renew
+                    // 注意：renewCreep 是由 Spawn 调用的，不是 Creep 自己
+                    // 可以考虑让 creep 稍微移动一下，避免完全挡住 spawn 的某个口？但简单起见先不动。
+                }
+            } else {
+                // 刷新过程中找不到 Spawn 了？可能是被摧毁了。停止刷新。
+                console.log(`${creep.name} (${creep.memory.role}) 在刷新过程中找不到 Spawn，停止刷新。`);
+                creep.memory.renewing = false;
+                return false;
+            }
+            
+            return true; // 正在刷新，阻止执行正常工作逻辑
+        }
+        
+        return false; // 不需要刷新
     },
     
     /**

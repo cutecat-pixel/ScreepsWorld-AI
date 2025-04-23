@@ -299,32 +299,75 @@ const roleRemoteBuilder = {
             const config = Memory.remoteBuilders[targetRoomName];
             
             // 跳过无效配置
-            if(!config || !config.count) continue;
+            if(!config || !config.count || config.count <= 0) continue; // 添加了 count <= 0 的检查
             
-            // 检查当前的远程建造者数量
-            const currentCount = _.filter(Game.creeps, creep => 
+            // 检查当前的远程建造者数量 (包括正在生成的)
+            const currentCreeps = _.filter(Game.creeps, creep => 
                 creep.memory.role === 'remoteBuilder' && 
                 creep.memory.targetRoom === targetRoomName
-            ).length;
-            
-            // 如果数量不足，为每个可能的出生房间添加任务
-            if(currentCount < config.count) {
-                const needToSpawn = config.count - currentCount;
-                
+            );
+            const currentCount = currentCreeps.length;
+
+            // 检查生成队列中是否已经有为该目标房间生成的请求
+            let queuedCount = 0;
+            for (const roomName in Memory.spawnQueue) {
+                 if (Memory.spawnQueue[roomName]) {
+                      queuedCount += _.filter(Memory.spawnQueue[roomName], request => 
+                          request.memory && 
+                          request.memory.role === 'remoteBuilder' && 
+                          request.memory.targetRoom === targetRoomName
+                      ).length;
+                 }
+            }
+
+            // 如果当前数量 + 队列中的数量 < 期望数量，则添加一个生成请求
+            if(currentCount + queuedCount < config.count) {
                 // 找到所有可能的出生房间
                 const possibleSpawnRooms = _.filter(Game.rooms, room => 
-                    room.controller && room.controller.my && room.find(FIND_MY_SPAWNS).length > 0
+                    room.controller && room.controller.my && room.find(FIND_MY_SPAWNS).length > 0 &&
+                    room.energyAvailable >= this.getRequiredEnergy() // 确保出生点能量足够
                 );
                 
                 if(possibleSpawnRooms.length > 0) {
-                    // 选择第一个有生成能力的房间
-                    const spawnRoom = possibleSpawnRooms[0];
+                    // 选择能量最充足或离目标最近的出生房间（这里简单选第一个）
+                    // TODO: 可以加入更优的Spawn选择逻辑，比如计算距离
+                    const spawnRoom = possibleSpawnRooms[0]; 
                     
-                    // 添加到该房间的生成队列
-                    this.createRemoteBuilderTask(spawnRoom.name, targetRoomName, config.count, 2);
+                    // 确保该房间的生成队列存在
+                    if(!Memory.spawnQueue) Memory.spawnQueue = {};
+                    if(!Memory.spawnQueue[spawnRoom.name]) Memory.spawnQueue[spawnRoom.name] = [];
+
+                    // 添加一个生成请求到该房间的生成队列
+                    const spawnRequest = {
+                        role: 'remoteBuilder',
+                        priority: 2, // 可以从 config 中读取优先级
+                        memory: {
+                            role: 'remoteBuilder',
+                            homeRoom: spawnRoom.name,
+                            targetRoom: targetRoomName,
+                            building: false
+                        }
+                    };
+                    Memory.spawnQueue[spawnRoom.name].push(spawnRequest);
+                    console.log(`RemoteBuilder Maintainer: Added 1 remoteBuilder spawn request for ${targetRoomName} to ${spawnRoom.name} queue. (Current: ${currentCount}, Queued: ${queuedCount}, Target: ${config.count})`);
+
+                } else {
+                     // 可选：记录无法找到合适spawn的日志
+                     // console.log(`RemoteBuilder Maintainer: Could not find a suitable spawn room for ${targetRoomName}`);
                 }
             }
         }
+    },
+
+    /**
+     * 计算生成远程建造者所需的基础能量
+     * (这个函数需要根据 getBody 的逻辑来确定)
+     */
+    getRequiredEnergy: function() {
+        // 假设基础身体是 [WORK, CARRY, MOVE, MOVE]
+        // 需要根据实际 getBody 逻辑调整
+        const body = [WORK, CARRY, MOVE, MOVE]; 
+        return _.sum(body, part => BODYPART_COST[part]);
     }
 };
 

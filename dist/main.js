@@ -239,6 +239,47 @@ global.clearRoomCostMatrix = function(roomName) {
     return _managers.movement.clearRoomCostMatrix(roomName);
 };
 
+/**
+ * Spawns Dismantler creeps targeting an Invader Core in a specific room.
+ * @param {string} spawnRoomName - The name of the room to spawn the creep from.
+ * @param {string} targetRoomName - The name of the room containing the Invader Core.
+ * @param {number} [count=1] - The number of dismantlers to spawn.
+ * @param {number} [priority=5] - The spawn queue priority (lower numbers spawn first).
+ */
+global.spawnInvaderCoreDismantler = function(spawnRoomName, targetRoomName, count = 1, priority = 5) {
+    if (!spawnRoomName || !targetRoomName) {
+        return 'Error: Missing arguments. Usage: spawnInvaderCoreDismantler(\'spawnRoomName\', \'targetRoomName\', [count], [priority])';
+    }
+
+    // Ensure the spawn queue exists for the spawn room
+    if (!Memory.spawnQueue) {
+        Memory.spawnQueue = {};
+    }
+    if (!Memory.spawnQueue[spawnRoomName]) {
+        Memory.spawnQueue[spawnRoomName] = [];
+    }
+
+    let addedCount = 0;
+    for (let i = 0; i < count; i++) {
+        const request = {
+            role: 'dismantler', // Must match the role filename/key
+            priority: priority,
+            memory: {
+                role: 'dismantler',
+                homeRoom: spawnRoomName,   // Room to return to (or base operations from)
+                targetRoom: targetRoomName // Room containing the Invader Core
+                // Add any other necessary memory flags here
+            }
+        };
+        Memory.spawnQueue[spawnRoomName].push(request);
+        addedCount++;
+    }
+
+    const message = `Added ${addedCount} dismantler request(s) to spawn queue for room ${spawnRoomName}, targeting ${targetRoomName}.`;
+    console.log(message);
+    return message;
+};
+
 // 添加手动生成防御者辅助函数
 global.spawnDefender = function(spawnRoomName, targetRoomName, priority = 1) {
     // 确保有生成队列
@@ -499,11 +540,14 @@ module.exports.loop = function () {
             // 管理终端交易
             _managers.terminal.run(room);
             
+            // 管理 Lab 反应和资源 (新增)
+            _managers.lab.run(room);
+            
             // 管理该房间的creep生成
             _managers.creep.manageCreeps(room, gameStage);
 
             // 运行PowerSpawn管理器
-            _managers.powerSpawn.run();
+            _managers.powerSpawn.run(room);
         }
     }
     // 运行所有creep的逻辑
