@@ -40,7 +40,7 @@ const roleLabHauler = {
         for (const task of sortedTasks) {
             const taskIndex = creep.room.memory.labTasks.findIndex(t => t.id === task.id);
             if (taskIndex === -1) continue; // 任务已不存在
-            
+
             const originalTask = creep.room.memory.labTasks[taskIndex];
 
             if (!originalTask.assignee) {
@@ -50,8 +50,8 @@ const roleLabHauler = {
                 creep.memory.resourceType = originalTask.resourceType;
                 creep.memory.labId = originalTask.labId;
                 creep.memory.amount = originalTask.amount;
-                creep.memory.collecting = (originalTask.type === 'load'); // 装载任务开始是收集状态，卸载任务开始是运输状态
-                creep.say(originalTask.type === 'load' ? '🧪 Load' : '🧪 Unload');
+                creep.memory.collecting = true;
+                creep.say(originalTask.type === 'load' ? '🧪' : '🧪 ');
                 return;
             }
         }
@@ -85,26 +85,43 @@ const roleLabHauler = {
         // 状态切换
         if (creep.memory.collecting && creep.store.getFreeCapacity() === 0) {
             creep.memory.collecting = false;
-            creep.say('🚚 Deliver');
-        }
-        if (!creep.memory.collecting && creep.store.getUsedCapacity(resourceType) === 0) {
-             // 如果是装载任务，并且身上空了，说明一趟运完了（可能没运够，也可能够了）
-             if (creep.memory.taskType === 'load') {
-                  // 检查任务是否完成（Lab是否满了或接近满）
-                 if (lab.store.getFreeCapacity(resourceType) < creep.store.getCapacity() * 0.5) { // Lab 空间不足一半了
-                     console.log(`Lab ${lab.id} 装载 ${resourceType} 任务 ${taskId} 完成`);
-                      this.completeTask(creep, taskIndex);
-                 } else {
-                      // 任务没完成，需要继续取货
-                      creep.memory.collecting = true;
-                      creep.say('🔄 Collect');
-                 }
-             } else { // 如果是卸载任务，并且身上空了，说明任务完成
-                  console.log(`Lab ${lab.id} 卸载 ${resourceType} 任务 ${taskId} 完成`);
-                 this.completeTask(creep, taskIndex);
-             }
+            creep.say('🚚');
         }
 
+        // 修改状态判断逻辑，处理多种资源的情况
+        if (!creep.memory.collecting) {
+            if (creep.store.getUsedCapacity(resourceType) === 0) {
+                // 当前任务资源已卸载完成
+                if (creep.memory.taskType === 'load') {
+                    // 检查任务是否完成（Lab是否满了或接近满）
+                    if (lab.store.getFreeCapacity(resourceType) < creep.store.getCapacity() * 0.5) { // Lab 空间不足一半了
+                        console.log(`Lab ${lab.id} 装载 ${resourceType} 任务 ${taskId} 完成`);
+                        // 如果还有其他资源，先处理其他资源
+                        if (creep.store.getUsedCapacity() > 0) {
+                            // 切换到卸载其他资源的状态
+                            this.handleExtraResources(creep);
+                            return;
+                        } else {
+                            this.completeTask(creep, taskIndex);
+                        }
+                    } else {
+                        // 任务没完成，需要继续取货
+                        creep.memory.collecting = true;
+                        creep.say('🔄');
+                    }
+                } else { // 如果是卸载任务，并且当前资源类型已卸载完
+                    console.log(`Lab ${lab.id} 卸载 ${resourceType} 任务 ${taskId} 完成`);
+                    // 如果还有其他资源，先处理其他资源
+                    if (creep.store.getUsedCapacity() > 0) {
+                        // 切换到卸载其他资源的状态
+                        this.handleExtraResources(creep);
+                        return;
+                    } else {
+                        this.completeTask(creep, taskIndex);
+                    }
+                }
+            }
+        }
 
         // 执行动作
         if (creep.memory.collecting) {
@@ -120,7 +137,7 @@ const roleLabHauler = {
                     console.log(`Creep ${creep.name} 无法找到 ${resourceType} 来执行装载任务 ${taskId}`);
                     // 任务无法完成，可以选择等待或取消
                     // 为了简单，先不取消，让它等待
-                    creep.say('❓ Source');
+                    creep.say('❓ ');
                     return;
                 }
 
@@ -170,10 +187,10 @@ const roleLabHauler = {
 
                 if (!target) {
                     console.log(`Creep ${creep.name} 无法找到地方卸载 ${resourceType} (任务 ${taskId})`);
-                    creep.say('❓ Target');
+                    creep.say('❓ ');
                     return;
                 }
-                
+
                  const result = creep.transfer(target, resourceType);
                  if (result === ERR_NOT_IN_RANGE) {
                      creep.moveTo(target, { visualizePathStyle: { stroke: '#ffffff' } });
@@ -187,7 +204,7 @@ const roleLabHauler = {
                          }
                      } else {
                          // 两个都满了，或者没有Terminal
-                         creep.say('⛔ Full');
+                         creep.say('⛔ ');
                          // 任务无法完成，等待
                      }
                  } else if (result !== OK) {
@@ -205,7 +222,7 @@ const roleLabHauler = {
             creep.room.memory.labTasks.splice(taskIndex, 1);
         }
         this.clearCreepMemory(creep);
-        creep.say('✓ Done');
+        creep.say('✓');
     },
 
     /**
@@ -219,7 +236,7 @@ const roleLabHauler = {
         delete creep.memory.amount;
         delete creep.memory.collecting;
     },
-    
+
     /**
      * 释放任务分配 (如果需要)
      */
@@ -233,6 +250,42 @@ const roleLabHauler = {
      },
 
     /**
+     * 处理Creep身上的额外资源
+     */
+    handleExtraResources: function(creep) {
+        // 临时保存任务信息
+        if (!creep.memory.originalTaskId) {
+            creep.memory.originalTaskId = creep.memory.taskId;
+            creep.memory.extraResourceMode = true;
+        }
+
+        // 处理身上所有资源
+        let target = creep.room.storage || creep.room.terminal;
+        if (!target) return;
+
+        // 找到第一个非空资源类型
+        for (const resourceType in creep.store) {
+            if (creep.store[resourceType] > 0) {
+                const result = creep.transfer(target, resourceType);
+                if (result === ERR_NOT_IN_RANGE) {
+                    creep.moveTo(target, { visualizePathStyle: { stroke: '#ffffff' } });
+                }
+                creep.say('🧹');
+                return; // 一次只处理一种资源
+            }
+        }
+
+        // 如果到这里说明全部资源都处理完了
+        const taskId = creep.memory.originalTaskId;
+        const taskIndex = creep.room.memory.labTasks.findIndex(t => t.id === taskId);
+
+        // 清理临时状态并完成原任务
+        delete creep.memory.extraResourceMode;
+        delete creep.memory.originalTaskId;
+        this.completeTask(creep, taskIndex);
+    },
+
+    /**
      * 闲置行为
      */
     idleBehavior: function(creep) {
@@ -240,12 +293,17 @@ const roleLabHauler = {
         if (creep.store.getUsedCapacity() > 0) {
              let target = creep.room.storage || creep.room.terminal;
              if (target) {
+                 // 改用循环确保卸载所有资源
                  for (const resourceType in creep.store) {
-                     if (creep.transfer(target, resourceType) === ERR_NOT_IN_RANGE) {
-                         creep.moveTo(target, { visualizePathStyle: { stroke: '#ffffff' } });
-                         return;
+                     if (creep.store[resourceType] > 0) {
+                         if (creep.transfer(target, resourceType) === ERR_NOT_IN_RANGE) {
+                             creep.moveTo(target, { visualizePathStyle: { stroke: '#ffffff' } });
+                             break; // 移动中，无需尝试其他资源
+                         }
+                         break; // 一次只处理一种资源
                      }
                  }
+                 return;
              }
         } else {
             // 移动到 Storage 附近等待
@@ -253,7 +311,7 @@ const roleLabHauler = {
             if (storage && !creep.pos.isNearTo(storage)) {
                  creep.moveTo(storage, { visualizePathStyle: { stroke: '#cccccc' }, range: 1 });
             } else {
-                 creep.say('🕒 Idle');
+                 creep.say('🕒 ');
             }
         }
     },
@@ -267,35 +325,22 @@ const roleLabHauler = {
         // Lab Hauler 不需要太大，但需要 CARRY 和 MOVE
         // 示例：目标是平衡 CARRY 和 MOVE
         let body = [];
-        const maxParts = 50;
-        let currentEnergy = energy;
-        let carryParts = 0;
-        let moveParts = 0;
-
-        while (currentEnergy >= 100 && body.length < maxParts - 1) {
-            if (currentEnergy >= 100) {
-                body.push(CARRY, MOVE);
-                carryParts++;
-                moveParts++;
-                currentEnergy -= 100;
-            } else {
-                break;
-            }
+        if(energy >= 500) {
+            // 中级阶段配置
+            body = [CARRY, CARRY, CARRY, CARRY, CARRY,
+                   MOVE, MOVE, MOVE, MOVE, MOVE];
         }
-         // 补齐剩余能量
-         if (currentEnergy >= 50 && body.length < maxParts) {
-             // 优先加 CARRY 还是 MOVE 取决于需求，这里简单加 CARRY
-             body.push(CARRY);
-             carryParts++;
-             currentEnergy -= 50;
-         }
-
-        if (body.length === 0) {
-            body = [CARRY, MOVE]; // 最小配置
+        else if(energy >= 300) {
+            // 基础配置
+            body = [CARRY, CARRY, CARRY, MOVE, MOVE, MOVE];
+        }
+        else {
+            // 最小配置
+            body = [CARRY, CARRY, MOVE, MOVE];
         }
 
         return body;
     }
 };
 
-module.exports = roleLabHauler; 
+module.exports = roleLabHauler;

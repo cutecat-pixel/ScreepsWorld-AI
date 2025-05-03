@@ -14,7 +14,8 @@ const linkManager = {
             room.memory.links = {
                 storage: null,
                 controller: null,
-                sources: []
+                sources: [],
+                enabled: true  // 默认启用LINK传输
             };
 
             // 查找房间中的所有LINK
@@ -67,6 +68,9 @@ const linkManager = {
         if(!room.controller || !room.controller.my) {
             return `错误: 房间 ${roomName} 不属于您或没有控制器`;
         }
+        
+        // 保存当前的启用状态(如果存在)
+        const enabledState = room.memory.links ? room.memory.links.enabled : true;
 
         // 清除现有的links配置
         if(room.memory.links) {
@@ -75,6 +79,11 @@ const linkManager = {
 
         // 重新初始化links
         this.initLinks(room);
+        
+        // 恢复原先的启用状态
+        if(room.memory.links) {
+            room.memory.links.enabled = enabledState;
+        }
 
         // 获取初始化后的配置信息
         const linksConfig = room.memory.links;
@@ -92,7 +101,8 @@ const linkManager = {
             result += `- 未找到Controller LINK\n`;
         }
 
-        result += `- Source LINKs (${linksConfig.sources.length}): ${linksConfig.sources.join(', ')}`;
+        result += `- Source LINKs (${linksConfig.sources.length}): ${linksConfig.sources.join(', ')}\n`;
+        result += `- LINK传输功能: ${linksConfig.enabled ? '开启' : '关闭'}`;
 
         return result;
     },
@@ -121,17 +131,20 @@ const linkManager = {
         const storageLink = Game.getObjectById(room.memory.links.storage);
         const controllerLink = Game.getObjectById(room.memory.links.controller);
 
-        // 如果没有这两个关键LINK，返回
-        if(!storageLink || !controllerLink) return;
+        // 如果没有STORAGE旁的LINK，返回
+        if(!storageLink) return;
 
+        // 控制器LINK能量传输（受enabled控制）
+        if(controllerLink && room.memory.links.enabled !== false) {
         // 如果控制器旁的LINK能量不足，且STORAGE旁的LINK能量充足，传输能量
         if(controllerLink.store.getUsedCapacity(RESOURCE_ENERGY) < 200 &&
-           storageLink.store.getUsedCapacity(RESOURCE_ENERGY) >= 600 &&
+           storageLink.store.getUsedCapacity(RESOURCE_ENERGY) >= 400 &&
            !storageLink.cooldown) {
             storageLink.transferEnergy(controllerLink);
+            }
         }
 
-        // 管理能源旁的LINK（将能量发送到STORAGE旁的LINK）
+        // 管理能源旁的LINK（将能量发送到STORAGE旁的LINK）- 不受enabled控制
         if(room.memory.links.sources.length > 0) {
             for(let sourceLinkId of room.memory.links.sources) {
                 const sourceLink = Game.getObjectById(sourceLinkId);
@@ -143,10 +156,34 @@ const linkManager = {
                 }
             }
         }
+    },
+    
+    /**
+     * 切换房间的LINK自动传输功能
+     * @param {string} roomName - 房间名称
+     * @returns {string} - 操作结果信息
+     */
+    toggleLinkTransfer: function(roomName) {
+        const room = Game.rooms[roomName];
+        
+        // 检查房间是否存在
+        if(!room) {
+            return `错误: 无法访问房间 ${roomName}`;
+        }
+        
+        // 确保links对象存在
+        if(!room.memory.links) {
+            this.initLinks(room);
+        }
+        
+        // 切换启用状态
+        room.memory.links.enabled = !room.memory.links.enabled;
+        
+        return `房间 ${roomName} 的LINK自动传输功能已${room.memory.links.enabled ? '开启' : '关闭'}`;
     }
 };
 
-// Add this line at the end of the file, before module.exports
+// 添加到全局对象，以便在控制台中使用
 global.linkManager = linkManager;
 
 module.exports = linkManager;

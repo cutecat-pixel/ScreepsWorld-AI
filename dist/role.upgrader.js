@@ -80,13 +80,14 @@ const roleUpgrader = {
         let body = [];
         
         // 根据游戏阶段和能量调整身体部件
-        if(gameStage.level >= 6 && energy >= 2300) {
-            // 后期阶段配置，大量WORK用于高效升级
-            body = [WORK, WORK, WORK, WORK, WORK, WORK, WORK, WORK, WORK, WORK, WORK, WORK, WORK, WORK ,WORK,
-                    CARRY, CARRY, CARRY, CARRY,
-                    MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE];
-        }
-        else if(gameStage.level >= 4 && energy >= 1200) {
+        // if(gameStage.level >= 6 && energy >= 2300) {
+        //     // 后期阶段配置，大量WORK用于高效升级
+        //     body = [WORK, WORK, WORK, WORK, WORK, WORK, WORK, WORK, WORK, WORK, WORK, WORK, WORK, WORK ,WORK,
+        //             CARRY, CARRY, CARRY, CARRY,
+        //             MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE];
+        // }
+        // else 
+        if(gameStage.level >= 4 && energy >= 1200) {
             // 后期阶段配置，大量WORK用于高效升级
             body = [WORK, WORK, WORK, WORK, WORK, WORK, WORK, CARRY,
                    CARRY, CARRY, MOVE, MOVE, MOVE, MOVE];

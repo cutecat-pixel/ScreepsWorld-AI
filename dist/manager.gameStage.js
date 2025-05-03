@@ -22,7 +22,7 @@ const GAME_STAGES = {
             transfer: 0
         }
     },
-    
+
     // 发展阶段：开始建造更多基础设施
     DEVELOPING: {
         name: '发展阶段',
@@ -34,20 +34,20 @@ const GAME_STAGES = {
             repairer: 1,
             miner: 0,
             hauler: 0,
-            defender: 1,
+            defender: 0,
             wallRepairer: 0,
             transfer: 0
         }
     },
-    
+
     // 中期阶段：开始使用专门的矿工和运输者
     MIDGAME: {
         name: '中期阶段',
         level: 3,
         creepCounts: {
-            harvester: 1,
-            upgrader: 3,
-            builder: 2,
+            harvester: 0,
+            upgrader: 2,
+            builder: 1,
             repairer: 1,
             miner: 2,
             hauler: 2,
@@ -56,7 +56,7 @@ const GAME_STAGES = {
             transfer: 0
         }
     },
-    
+
     // 高级阶段：完整的自动化和防御系统
     ADVANCED: {
         name: '高级阶段',
@@ -73,7 +73,7 @@ const GAME_STAGES = {
             transfer: 2
         }
     },
-    
+
     // 后期阶段：高度优化，准备扩张
     LATE: {
         name: '后期阶段',
@@ -90,27 +90,27 @@ const GAME_STAGES = {
             transfer: 2
         }
     },
-    
+
     // 矿物开发阶段：开始提取并处理矿物
     MINERAL: {
         name: '矿物阶段',
         level: 6,
         creepCounts: {
             harvester: 0,
-            upgrader: 1,
+            upgrader: 2,
             builder: 1,
             repairer: 1,
             miner: 2,
             hauler: 2,
             defender: 0,
             wallRepairer: 1,
-            transfer: 2,
+            transfer: 1,
             mineralHarvester: 0, // 默认值0，在有Extractor时动态调整
             mineralHauler: 0,     // 默认值0，在有Extractor时动态调整
             terminalHauler: 1
         }
     },
-    
+
     // 终极阶段：全面发展与优化
     END: {
         name: '终极阶段',
@@ -124,7 +124,7 @@ const GAME_STAGES = {
             hauler: 2,
             defender: 0,
             wallRepairer: 1,
-            transfer: 2,
+            transfer: 1,
             mineralHarvester: 0, // 默认值0，在有Extractor时动态调整
             mineralHauler: 0 ,    // 默认值0，在有Extractor时动态调整
             terminalHauler: 1
@@ -140,12 +140,12 @@ const GAME_STAGES = {
 function getRoomStage(room) {
     // 初始化默认为EARLY阶段
     let roomStage = GAME_STAGES.EARLY;
-    
+
     // 检查房间是否存在及是否被我们控制
     if(!room || !room.controller || !room.controller.my) {
         return roomStage;
     }
-    
+
     // 基于控制器等级初步判断
     if(room.controller.level >= 8) {
         roomStage = GAME_STAGES.END;
@@ -164,11 +164,11 @@ function getRoomStage(room) {
         const containers = room.find(FIND_STRUCTURES, {
             filter: s => s.structureType === STRUCTURE_CONTAINER
         }).length;
-        
+
         const towers = room.find(FIND_MY_STRUCTURES, {
             filter: s => s.structureType === STRUCTURE_TOWER
         }).length;
-        
+
         if(containers >= 2 && towers >= 1) {
             roomStage = GAME_STAGES.MIDGAME;
         } else {
@@ -181,22 +181,22 @@ function getRoomStage(room) {
     else {
         roomStage = GAME_STAGES.EARLY;
     }
-    
+
     // 检查该房间是否受到攻击，如果是，调整防御者需求
     if(Memory.roomData && Memory.roomData[room.name] && Memory.roomData[room.name].underAttack) {
         // 创建一个新对象以避免修改原始常量
         roomStage = Object.assign({}, roomStage);
         roomStage.creepCounts = Object.assign({}, roomStage.creepCounts);
-        
+
         // 判断是否有塔且塔能量充足
         let needExtraDefenders = false;
-        
+
         // 如果处于中期或以上阶段，检查塔的能量
         if(roomStage.level >= 3) {
             const towers = room.find(FIND_MY_STRUCTURES, {
                 filter: s => s.structureType === STRUCTURE_TOWER
             });
-            
+
             // 检查塔的能量状况
             if(towers.length === 0) {
                 // 如果没有塔，需要额外的防御者
@@ -214,12 +214,12 @@ function getRoomStage(room) {
             // 早期阶段始终需要额外防御者
             needExtraDefenders = true;
         }
-        
+
         if(needExtraDefenders) {
             roomStage.creepCounts.defender += 1; // 额外增加1个防御者
         }
     }
-    
+
     return roomStage;
 }
 
@@ -233,103 +233,96 @@ function getCurrentStage(room) {
     if(room) {
         return getRoomStage(room);
     }
-    
+
     // 向后兼容：如果没有提供房间，返回所有房间中的最高阶段
     let currentStage = GAME_STAGES.EARLY;
-    
+
     // 遍历所有房间
     for(let name in Game.rooms) {
         const room = Game.rooms[name];
-        
+
         // 只检查我们控制的房间
         if(!room.controller || !room.controller.my) continue;
-        
+
         // 获取该房间的阶段
         const roomStage = getRoomStage(room);
-        
+
         // 如果这个房间的阶段比当前计算的高，更新当前阶段
         if(roomStage.level > currentStage.level) {
             currentStage = roomStage;
         }
     }
-    
+
     return currentStage;
 }
 
 // 根据房间和游戏阶段获取每种角色的目标数量
 function getCreepCountsByRole(room, gameStage) {
     // 检查是否是战争状态
-    const isUnderAttack = Memory.roomData && 
-                         Memory.roomData[room.name] && 
+    const isUnderAttack = Memory.roomData &&
+                         Memory.roomData[room.name] &&
                          Memory.roomData[room.name].underAttack;
-    
+
     // 创建副本以避免修改原始对象
     let targetCounts = Object.assign({}, gameStage.creepCounts);
-    
+
     // 根据房间具体情况调整数量
-    
+
     // 1. 检查源的数量，调整矿工数量
     if(gameStage.level >= 3) { // 只有中期以上才使用专门的矿工
         const sourceCount = room.find(FIND_SOURCES).length;
         targetCounts.miner = Math.min(sourceCount, targetCounts.miner);
     }
-    
+
     // 2. 根据建筑工地数量调整建造者数量
     const constructionSites = room.find(FIND_CONSTRUCTION_SITES).length;
     if(constructionSites === 0) {
         targetCounts.builder = Math.max(1, targetCounts.builder - 1);
     }
-    
+
     // 3. 处理防御者的生成逻辑
     if(isUnderAttack) {
         // 如果房间正在被攻击
         if(room.controller.level >= 3) {
-            // 如果控制器等级大于3级，检查塔的能量情况
-            const towers = room.find(FIND_MY_STRUCTURES, {
-                filter: s => s.structureType === STRUCTURE_TOWER
-            });
+            // 查找房间中的敌对creeps
+            const hostiles = room.find(FIND_HOSTILE_CREEPS);
             
-            // 只有在没有足够能量的塔时才生成额外防御者
-            let needExtraDefenders = false;
-            
-            if(towers.length === 0) {
-                // 如果没有塔，需要额外防御者
-                needExtraDefenders = true;
-            } else {
-                // 检查所有塔的能量状况
-                for(const tower of towers) {
-                    // 如果任何一个塔的能量低于10%，才需要额外防御者
-                    if(tower.store[RESOURCE_ENERGY] < tower.store.getCapacity(RESOURCE_ENERGY) * 0.1) {
-                        needExtraDefenders = true;
-                        break;
-                    }
+            // 检查是否有带HEAL部件的入侵者
+            let hasHealers = false;
+            for(const hostile of hostiles) {
+                // 统计HEAL部件数量
+                const healParts = hostile.body.filter(part => part.type === HEAL).length;
+                if(healParts > 0) {
+                    hasHealers = true;
+                    break;
                 }
             }
             
-            // 默认维持1个防御者，如果需要额外防御者，再增加1个
-            if(needExtraDefenders) {
-                targetCounts.defender += 1;
+            // 如果有带HEAL部件的入侵者，直接设置防御者数量为2
+            if(hasHealers) {
+                targetCounts.defender = 2;
             }
-        } else {
+        } 
+        else {
             // 低等级房间直接增加防御者
             targetCounts.defender += 1;
         }
     }
-    
+
     // 4. 矿物采集者和运输者的生成逻辑
     if(gameStage.level >= 6) { // 只有RCL 6级以上才考虑矿物处理
         // 检查房间中是否有Extractor
         const extractors = room.find(FIND_MY_STRUCTURES, {
             filter: s => s.structureType === STRUCTURE_EXTRACTOR
         });
-        
+
         if(extractors.length > 0) {
-            
+
             // 有Extractor，检查矿物是否有效
             const minerals = room.find(FIND_MINERALS);
-            
+
             if(minerals.length > 0) {
-                
+
                 if(minerals[0].mineralAmount > 0) {
                     // 矿物存在且有矿物量，需要矿物采集者和运输者
                     // 检查矿物附近是否有容器
@@ -337,12 +330,12 @@ function getCreepCountsByRole(room, gameStage) {
                     const containers = mineral.pos.findInRange(FIND_STRUCTURES, 1, {
                         filter: s => s.structureType === STRUCTURE_CONTAINER
                     });
-                    
+
                     // 检查是否有建设中的容器
                     const containerSites = mineral.pos.findInRange(FIND_CONSTRUCTION_SITES, 1, {
                         filter: s => s.structureType === STRUCTURE_CONTAINER
                     });
-                    
+
                     if(containers.length > 0) {
                         // 有容器，启用矿物采集和运输
                         targetCounts.mineralHarvester = 1;
@@ -351,33 +344,13 @@ function getCreepCountsByRole(room, gameStage) {
                 }
             }
         }
-        
-        // 5. 终端运输者的生成逻辑
-        if(room.terminal) {
-            // 检查是否有终端任务
-            const hasTerminalTasks = room.memory.terminalTasks && room.memory.terminalTasks.length > 0;
-            
-            // 检查是否启用了自动交易
-            const isAutoTradingEnabled = room.memory.autoTrading && room.memory.autoTrading.enabled;
-            
-            // 如果有终端任务或启用了自动交易，需要终端运输者
-            if(hasTerminalTasks || isAutoTradingEnabled) {
-                targetCounts.terminalHauler = 1;
-            } else {
-                // 没有终端任务，不需要专门的终端运输者
-                targetCounts.terminalHauler = 0;
-            }
-        } else {
-            // 没有终端，不需要终端运输者
-            targetCounts.terminalHauler = 0;
-        }
     }
-    
+
     // 6. Lab Hauler 的生成逻辑 (新增)
     if (gameStage.level >= 6 && room.find(FIND_MY_STRUCTURES, { filter: s => s.structureType === STRUCTURE_LAB }).length >= 3) {
         // 检查是否有待处理的Lab任务
         const hasLabTasks = room.memory.labTasks && room.memory.labTasks.length > 0;
-        
+
         if (hasLabTasks) {
             targetCounts.labHauler = 1; // 如果有任务，需要一个 Lab Hauler
         } else {
@@ -386,7 +359,25 @@ function getCreepCountsByRole(room, gameStage) {
     } else {
         targetCounts.labHauler = 0; // 等级不够或Lab不足则不需要
     }
-    
+
+    // 终端运输者的生成逻辑 (新增)
+    if (gameStage.level >= 6) {
+        // 检查房间内是否有STORAGE和CONTROLLER附近的LINK
+        let hasLinks = false;
+        if (room.memory.links && room.memory.links.storage && room.memory.links.controller) {
+            const storageLink = Game.getObjectById(room.memory.links.storage);
+            const controllerLink = Game.getObjectById(room.memory.links.controller);
+            if (storageLink && controllerLink) {
+                hasLinks = true;
+            }
+        }
+
+        // RCL 6及以上，只要有终端或者有LINK网络，就需要终端运输者
+        if (room.terminal || hasLinks) {
+            targetCounts.terminalHauler = 1;
+        }
+    }
+
     // 7. 处理Storage Hauler的生成逻辑
     if(room.memory.remoteHaulerConfig) {
         let totalStorageHaulers = 0;
@@ -396,15 +387,15 @@ function getCreepCountsByRole(room, gameStage) {
             if(room.memory.storageHaulers[targetRoomName]) {
                 // 获取需要的remoteHauler数量
                 const count = room.memory.storageHaulers[targetRoomName].count || 0;
-                
+
                 // 添加到目标数量中
                 totalStorageHaulers += count;
-                
+
                 // 确保创建remoteHauler所需的配置
                 if(!Memory.creepConfigs) Memory.creepConfigs = {};
                 if(!Memory.creepConfigs.remoteHauler) Memory.creepConfigs.remoteHauler = {};
                 if(!Memory.creepConfigs.remoteHauler[room.name]) Memory.creepConfigs.remoteHauler[room.name] = {};
-                
+
                 // 设置或更新配置
                 Memory.creepConfigs.remoteHauler[room.name] = {
                     targetRoom: targetRoomName,
@@ -415,7 +406,57 @@ function getCreepCountsByRole(room, gameStage) {
         }
         targetCounts.remoteHauler = totalStorageHaulers;
     }
-    
+
+    // 4. 根据LINK的存在调整Transfer的数量
+    if(gameStage.level >= 6) { // RCL 5或以上才可能有多个LINK
+        // 检查房间中LINK的数量
+        const linkCount = room.find(FIND_MY_STRUCTURES, {
+            filter: s => s.structureType === STRUCTURE_LINK
+        }).length;
+
+        // 默认值为2
+        targetCounts.transfer = 2;
+
+        // 移除linkCount >= 3的条件，对任何数量的LINK都进行检查
+        // 检查所有容器是否有LINK在附近
+        // 先找出所有矿物位置
+        const minerals = room.find(FIND_MINERALS);
+
+        // 找出不在矿物附近的容器
+        const containers = room.find(FIND_STRUCTURES, {
+            filter: s => s.structureType === STRUCTURE_CONTAINER
+        }).filter(container => {
+            // 对每个容器检查是否在任何矿物附近
+            for (const mineral of minerals) {
+                if (container.pos.inRangeTo(mineral, 1)) {
+                    return false; // 如果容器靠近矿物，排除它
+                }
+            }
+            return true; // 容器不靠近任何矿物
+        });
+
+        let containersWithoutLink = 0;
+
+        for(const container of containers) {
+            const nearbyLinks = container.pos.findInRange(FIND_MY_STRUCTURES, 2, {
+                filter: s => s.structureType === STRUCTURE_LINK
+            });
+
+            if(nearbyLinks.length === 0) {
+                containersWithoutLink++;
+            }
+        }
+
+        // 根据没有LINK的容器数量调整transfer数量
+        if (containersWithoutLink === 1) {
+            targetCounts.transfer = 1;
+        }
+        // 如果没有没有LINK的容器，不需要Transfer
+        else if(containersWithoutLink === 0) {
+            targetCounts.transfer = 0;
+        }
+    }
+
     return targetCounts;
 }
 
@@ -423,4 +464,4 @@ module.exports = {
     getCurrentStage,
     getCreepCountsByRole,
     GAME_STAGES
-}; 
+};

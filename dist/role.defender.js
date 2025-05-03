@@ -8,6 +8,14 @@ const roleDefender = {
      * @param {Creep} creep - 要控制的creep对象
      */
     run: function(creep) {
+        // 检查是否需要boost
+        if(!creep.memory.boosted && !creep.memory.noBoost) {
+            // 尝试获取boost
+            if(this.tryGetBoost(creep)) {
+                return; // 如果正在前往boost或正在boost中，直接返回
+            }
+        }
+        
         // 检查是否有指定的目标房间
         if(creep.memory.targetRoom && creep.room.name !== creep.memory.targetRoom) {
             // 如果不在目标房间，移动到目标房间
@@ -148,8 +156,175 @@ const roleDefender = {
             // --- 如果没有敌人且没有 Invader Core，执行巡逻 --- 
             else {
                 this.patrolRoom(creep);
+                // 检查是否有HEAL部件进行自我治疗
+                if(this.countBodyParts(creep, HEAL) > 0 && creep.hits < creep.hitsMax) {
+                    creep.heal(creep);
+                }
             }
         }
+    },
+    
+    /**
+     * 尝试获取boost
+     * @param {Creep} creep - 需要boost的creep
+     * @returns {boolean} - 如果正在前往boost或正在boost中，返回true
+     */
+    tryGetBoost: function(creep) {
+        // 如果已经boosted，返回false
+        if(creep.memory.boosted) return false;
+        
+        // 在家乡房间寻找有可用boost的lab
+        const homeRoom = Game.rooms[creep.memory.homeRoom];
+        if(!homeRoom) {
+            // 如果不在家乡房间，先返回家乡房间
+            if(creep.room.name !== creep.memory.homeRoom) {
+                creep.moveTo(new RoomPosition(25, 25, creep.memory.homeRoom), {
+                    visualizePathStyle: {stroke: '#ffffff'},
+                    reusePath: 20
+                });
+                creep.say('🏠 Home');
+                return true;
+            } else {
+                // 无法访问家乡房间但已在家乡房间，标记为无法boost
+                creep.memory.noBoost = true;
+                return false;
+            }
+        }
+        
+        // 检查是否有准备好boost的lab
+        const labs = homeRoom.find(FIND_MY_STRUCTURES, {
+            filter: s => s.structureType === STRUCTURE_LAB && 
+                      s.mineralType && 
+                      s.store[s.mineralType] >= 30 && // 确保有足够的化合物
+                      s.store[RESOURCE_ENERGY] >= 20 // 确保有足够的能量
+        });
+        
+        if(labs.length === 0) {
+            // 没有准备好的lab，标记为无法boost
+            creep.memory.noBoost = true;
+            return false;
+        }
+        
+        // 获取creep的部件类型
+        const bodyParts = {};
+        creep.body.forEach(part => {
+            if(!bodyParts[part.type]) bodyParts[part.type] = 0;
+            bodyParts[part.type]++;
+        });
+        
+        // 定义部件类型到boost类型的映射
+        const boostMap = {
+            [ATTACK]: [
+                RESOURCE_CATALYZED_UTRIUM_ACID,    // UH2O - 提高攻击力700%
+                RESOURCE_UTRIUM_HYDRIDE,           // UH - 提高攻击力400%
+                RESOURCE_UTRIUM_ACID               // UHO2 - 提高攻击力200%
+            ],
+            [RANGED_ATTACK]: [
+                RESOURCE_CATALYZED_KEANIUM_ALKALIDE, // XKHO2 - 提高远程攻击力700%
+                RESOURCE_KEANIUM_OXIDE,              // KO - 提高远程攻击力400%
+                RESOURCE_KEANIUM_ALKALIDE            // KHO2 - 提高远程攻击力200%
+            ],
+            [HEAL]: [
+                RESOURCE_CATALYZED_LEMERGIUM_ALKALIDE, // XLHO2 - 提高治疗力700%
+                RESOURCE_LEMERGIUM_OXIDE,              // LO - 提高治疗力400%
+                RESOURCE_LEMERGIUM_ALKALIDE            // LHO2 - 提高治疗力200%
+            ],
+            [TOUGH]: [
+                RESOURCE_CATALYZED_GHODIUM_ALKALIDE, // XGHO2 - 减少伤害70%
+                RESOURCE_GHODIUM_OXIDE,              // GO - 减少伤害50%
+                RESOURCE_GHODIUM_ALKALIDE            // GHO2 - 减少伤害30%
+            ],
+            [MOVE]: [
+                RESOURCE_CATALYZED_ZYNTHIUM_ALKALIDE, // XZHO2 - 提高移动速度700%
+                RESOURCE_ZYNTHIUM_OXIDE,             // ZO - 提高移动速度400%
+                RESOURCE_ZYNTHIUM_ALKALIDE           // ZHO2 - 提高移动速度200%
+            ]
+        };
+        
+        // 寻找可用于boost的lab (优先使用高级boost)
+        let targetLabs = [];
+        
+        // 遍历每种部件类型
+        for(const partType in bodyParts) {
+            // 跳过不需要boost的部件
+            if(!boostMap[partType]) continue;
+            
+            // 检查对应的boost资源
+            for(const boostType of boostMap[partType]) {
+                const boostLabs = labs.filter(lab => lab.mineralType === boostType);
+                
+                if(boostLabs.length > 0) {
+                    // 找到可用的boost lab
+                    targetLabs.push({
+                        lab: boostLabs[0],
+                        partType: partType,
+                        boostType: boostType
+                    });
+                    break; // 每种部件类型只需一个boost lab
+                }
+            }
+        }
+        
+        // 如果没有可用的boost lab，标记为无法boost
+        if(targetLabs.length === 0) {
+            creep.memory.noBoost = true;
+            return false;
+        }
+        
+        // 前往第一个lab进行boost
+        const firstTarget = targetLabs[0];
+        const lab = firstTarget.lab;
+        
+        // 初始化待boost的部件类型列表
+        if(!creep.memory.boostParts) {
+            creep.memory.boostParts = {};
+            targetLabs.forEach(target => {
+                creep.memory.boostParts[target.partType] = target.boostType;
+            });
+        }
+        
+        // 如果不在lab旁边，移动到lab
+        if(!creep.pos.isNearTo(lab)) {
+            creep.moveTo(lab, {
+                visualizePathStyle: {stroke: '#ffaa00'},
+                reusePath: 5
+            });
+            creep.say('🧪 Boost');
+            return true;
+        }
+        
+        // 找到当前lab对应的部件类型
+        const partType = firstTarget.partType;
+        const boostType = firstTarget.boostType;
+        
+        // 进行boost
+        const result = lab.boostCreep(creep, bodyParts[partType]);
+        
+        if(result === OK) {
+            console.log(`${creep.name} 成功使用 ${boostType} boost了 ${bodyParts[partType]} 个 ${partType} 部件`);
+            // 从待boost列表中移除此部件类型
+            delete creep.memory.boostParts[partType];
+            
+            // 检查是否所有部件都已boost
+            if(Object.keys(creep.memory.boostParts).length === 0) {
+                creep.memory.boosted = true;
+                delete creep.memory.boostParts;
+                creep.say('💪 Ready!');
+            }
+        } else if(result === ERR_NOT_IN_RANGE) {
+            // 应该不会出现，因为前面已经检查了距离
+            creep.moveTo(lab);
+        } else if(result === ERR_NOT_ENOUGH_RESOURCES) {
+            // lab资源不足，移除此boost
+            console.log(`Lab ${lab.id} 的 ${boostType} 资源不足，无法boost ${creep.name}`);
+            delete creep.memory.boostParts[partType];
+        } else {
+            // 其他错误
+            console.log(`Boost失败，错误码: ${result}`);
+            delete creep.memory.boostParts[partType];
+        }
+        
+        return true; // 正在进行boost
     },
     
     /**
@@ -244,10 +419,10 @@ const roleDefender = {
         if(gameStage.level >= 3 && energy >= 1700) {
             // 高级阶段配置，多功能防御者（远程攻击和治疗能力）
             body = [
-                TOUGH, TOUGH, ATTACK,
-                RANGED_ATTACK, RANGED_ATTACK, 
-                RANGED_ATTACK, 
+                TOUGH, TOUGH, 
                 MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE,
+                ATTACK,
+                RANGED_ATTACK, RANGED_ATTACK, RANGED_ATTACK, 
                 HEAL, HEAL
             ];
         }

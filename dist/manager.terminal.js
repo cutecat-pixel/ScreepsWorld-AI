@@ -1,6 +1,6 @@
 /**
  * 终端管理器模块
- * 负责管理终端交易，特别是K矿物的订单处理
+ * 负责管理终端交易，支持多种矿物和化合物资源的自动交易
  */
 const managerTerminal = {
     /**
@@ -31,7 +31,7 @@ const managerTerminal = {
         
         // 如果自动交易已启用，处理交易
         if(room.memory.autoTrading.enabled) {
-            this.processKMineralTrading(room, terminal);
+            this.processResourceTrading(room, terminal);
         }
     },
     
@@ -133,48 +133,50 @@ const managerTerminal = {
     },
     
     /**
-     * 处理K矿物的自动交易
+     * 处理所有已配置资源的自动交易
      * @param {Room} room - 房间对象
      * @param {StructureTerminal} terminal - 终端对象
      */
-    processKMineralTrading: function(room, terminal) {
-        // 只处理K矿物
-        const resourceType = RESOURCE_KEANIUM;
-        
-        // 检查是否配置了K矿物的自动交易
-        if(!room.memory.autoTrading.resources[resourceType]) {
-            return;
-        }
-        
-        const config = room.memory.autoTrading.resources[resourceType];
-        const minAmount = config.minAmount || 1000; // 保留的最小数量
-        const storage = room.storage;
-        
-        // 获取当前房间K矿物总量(包括storage和terminal)
-        let currentAmount = terminal.store[resourceType] || 0;
-        if(storage) {
-            currentAmount += storage.store[resourceType] || 0;
-        }
-        
-        console.log(`房间 ${room.name} K矿物总量: ${currentAmount}`);
-        
-        // 检查是否有足够的K矿物满足保留量
-        if(currentAmount <= minAmount) {
-            console.log(`房间 ${room.name} K矿物数量不足(${currentAmount}/${minAmount})，不执行交易`);
-            return;
-        }
-        
-        // 检查是否有未完成的订单
-        if(config.orderId) {
-            this.checkExistingOrder(room, terminal, resourceType, config, currentAmount, minAmount);
-        } else {
-            // 如果没有活跃订单，寻找新订单
-            this.findNewKMineralOrder(room, terminal, resourceType, currentAmount, minAmount);
+    processResourceTrading: function(room, terminal) {
+        // 遍历所有配置的资源
+        for (const resourceType in room.memory.autoTrading.resources) {
+            // 检查该资源是否配置了自动交易
+            if (!room.memory.autoTrading.resources[resourceType]) {
+                continue;
+            }
+            
+            const config = room.memory.autoTrading.resources[resourceType];
+            const minAmount = config.minAmount || 1000; // 保留的最小数量
+            const storage = room.storage;
+            
+            // 获取当前房间资源总量(包括storage和terminal)
+            let currentAmount = terminal.store[resourceType] || 0;
+            if (storage) {
+                currentAmount += storage.store[resourceType] || 0;
+            }
+            
+            // 打印资源总量信息（如果超过保留量）
+            if (currentAmount > minAmount) {
+                console.log(`房间 ${room.name} ${resourceType}总量: ${currentAmount}`);
+            }
+            
+            // 检查是否有足够的资源满足保留量
+            if (currentAmount <= minAmount) {
+                continue;
+            }
+            
+            // 检查是否有未完成的订单
+            if (config.orderId) {
+                this.checkExistingOrder(room, terminal, resourceType, config, currentAmount, minAmount);
+            } else {
+                // 如果没有活跃订单，寻找新订单
+                this.findNewResourceOrder(room, terminal, resourceType, currentAmount, minAmount);
+            }
         }
     },
     
     /**
-     * 检查现有的K矿物订单
+     * 检查现有的资源订单
      */
     checkExistingOrder: function(room, terminal, resourceType, config, currentAmount, minAmount) {
         const orderId = config.orderId;
@@ -182,7 +184,7 @@ const managerTerminal = {
         
         // 如果订单不存在或已完成，清除订单ID
         if(!order || order.remainingAmount === 0) {
-            console.log(`房间 ${room.name} 的K矿物订单 ${orderId} 已完成或不存在，清除记录`);
+            console.log(`房间 ${room.name} 的${resourceType}订单 ${orderId} 已完成或不存在，清除记录`);
             delete room.memory.autoTrading.resources[resourceType].orderId;
             return;
         }
@@ -191,11 +193,11 @@ const managerTerminal = {
         const availableAmount = currentAmount - minAmount;
         const amountToTrade = Math.min(availableAmount, order.remainingAmount);
         
-        // 确保终端有足够的K矿物
+        // 确保终端有足够的资源
         if(terminal.store[resourceType] < amountToTrade) {
-            // 需要从Storage转移K矿物到Terminal
+            // 需要从Storage转移资源到Terminal
             const neededAmount = amountToTrade - terminal.store[resourceType];
-            this.requestMineralTransfer(room, resourceType, neededAmount);
+            this.requestResourceTransfer(room, resourceType, neededAmount);
             return;
         }
         
@@ -211,14 +213,14 @@ const managerTerminal = {
         // 执行交易
         const result = Game.market.deal(orderId, amountToTrade, room.name);
         if(result === OK) {
-            console.log(`房间 ${room.name} 成功交易 ${amountToTrade} 单位K矿物，订单ID: ${orderId}`);
+            console.log(`房间 ${room.name} 成功交易 ${amountToTrade} 单位${resourceType}，订单ID: ${orderId}`);
             
             // 如果订单已经完成，清除订单ID
             if(order.remainingAmount - amountToTrade <= 0) {
                 delete room.memory.autoTrading.resources[resourceType].orderId;
             }
         } else {
-            console.log(`房间 ${room.name} 交易K矿物失败，错误代码: ${result}`);
+            console.log(`房间 ${room.name} 交易${resourceType}失败，错误代码: ${result}`);
             
             // 如果交易失败(例如订单不存在)，清除订单ID
             if(result === ERR_INVALID_ARGS) {
@@ -228,31 +230,39 @@ const managerTerminal = {
     },
     
     /**
-     * 寻找新的K矿物订单
+     * 寻找新的资源订单
      */
-    findNewKMineralOrder: function(room, terminal, resourceType, currentAmount, minAmount) {
+    findNewResourceOrder: function(room, terminal, resourceType, currentAmount, minAmount) {
         // 计算可以交易的数量
         const availableAmount = currentAmount - minAmount;
         if(availableAmount <= 0) return;
         
-        // 查找市场上所有购买K矿物的订单
+        // 查找市场上所有购买该资源的订单
         const orders = Game.market.getAllOrders({
             resourceType: resourceType,
             type: ORDER_BUY
         });
         
         if(!orders || orders.length === 0) {
-            console.log(`市场上没有K矿物的购买订单`);
-            return;
+            return; // 市场上没有该资源的购买订单，静默返回
         }
         
         // 按照价格从高到低排序订单
         orders.sort((a, b) => b.price - a.price);
         
+        // 获取价格阈值（如果已配置）
+        const minPrice = room.memory.autoTrading.resources[resourceType].minPrice || 0;
+        
         // 查找价格最好的有效订单
         for(const order of orders) {
             // 检查订单是否有效
             if(order.amount <= 0 || order.remainingAmount <= 0) continue;
+            
+            // 检查价格是否满足最低要求
+            if(order.price < minPrice) {
+                console.log(`房间 ${room.name} 找到 ${resourceType} 订单，但价格 ${order.price} 低于最低要求 ${minPrice}`);
+                continue;
+            }
             
             // 计算交易成本
             const tradeCost = Game.market.calcTransactionCost(
@@ -273,7 +283,7 @@ const managerTerminal = {
             
             // 如果订单满足条件，保存该订单ID
             room.memory.autoTrading.resources[resourceType].orderId = order.id;
-            console.log(`房间 ${room.name} 找到新的K矿物订单，ID: ${order.id}，价格: ${order.price}`);
+            console.log(`房间 ${room.name} 找到新的${resourceType}订单，ID: ${order.id}，价格: ${order.price}`);
             
             // 接下来的tick会处理这个订单
             break;
@@ -281,15 +291,15 @@ const managerTerminal = {
     },
     
     /**
-     * 请求从Storage转移K矿物到Terminal
+     * 请求从Storage转移资源到Terminal
      */
-    requestMineralTransfer: function(room, resourceType, amount) {
+    requestResourceTransfer: function(room, resourceType, amount) {
         if(!room.storage || !room.terminal) return;
         
         // 检查storage中是否有足够的资源
         const availableInStorage = room.storage.store[resourceType] || 0;
         if(availableInStorage < amount) {
-            console.log(`房间 ${room.name} 的Storage中K矿物不足，无法转移到Terminal，需要: ${amount}，可用: ${availableInStorage}`);
+            console.log(`房间 ${room.name} 的Storage中${resourceType}不足，无法转移到Terminal，需要: ${amount}，可用: ${availableInStorage}`);
             return;
         }
         
@@ -298,18 +308,31 @@ const managerTerminal = {
             room.memory.terminalTasks = [];
         }
         
-        // 添加运输任务
-        room.memory.terminalTasks.push({
-            id: Game.time.toString() + resourceType,
-            type: 'transfer',
-            resource: resourceType,
-            amount: amount,
-            from: 'storage',
-            to: 'terminal',
-            priority: 2 // 高优先级
-        });
+        // 检查是否已有相同类型的任务
+        const existingTask = _.find(room.memory.terminalTasks, task => 
+            task.resource === resourceType && 
+            task.from === 'storage' && 
+            task.to === 'terminal'
+        );
         
-        console.log(`房间 ${room.name} 创建了K矿物转移任务，从Storage转移 ${amount} 单位到Terminal`);
+        if(existingTask) {
+            // 更新现有任务的数量
+            existingTask.amount += amount;
+            console.log(`房间 ${room.name} 更新了${resourceType}转移任务，从Storage转移 ${existingTask.amount} 单位到Terminal`);
+        } else {
+            // 添加新的运输任务
+            room.memory.terminalTasks.push({
+                id: Game.time.toString() + resourceType,
+                type: 'transfer',
+                resource: resourceType,
+                amount: amount,
+                from: 'storage',
+                to: 'terminal',
+                priority: 2 // 高优先级
+            });
+            
+            console.log(`房间 ${room.name} 创建了${resourceType}转移任务，从Storage转移 ${amount} 单位到Terminal`);
+        }
     },
     
     /**
@@ -367,12 +390,14 @@ const managerTerminal = {
     },
     
     /**
-     * 启用K矿物的自动交易
+     * 启用资源自动交易
      * @param {string} roomName - 房间名称
-     * @param {number} minAmount - 保留的最小K矿物数量
+     * @param {string} resourceType - 资源类型
+     * @param {number} minAmount - 保留的最小资源数量
+     * @param {number} minPrice - 最低接受价格（可选）
      * @returns {string} - 操作结果信息
      */
-    enableKMineralTrading: function(roomName, minAmount = 1000) {
+    enableResourceTrading: function(roomName, resourceType, minAmount = 1000, minPrice = 0) {
         const room = Game.rooms[roomName];
         if(!room) {
             return `错误：无法访问房间 ${roomName}`;
@@ -390,20 +415,26 @@ const managerTerminal = {
         // 启用自动交易
         room.memory.autoTrading.enabled = true;
         
-        // 配置K矿物交易
-        room.memory.autoTrading.resources[RESOURCE_KEANIUM] = {
+        // 配置资源交易
+        room.memory.autoTrading.resources[resourceType] = {
             minAmount: minAmount
         };
         
-        return `房间 ${roomName} 的K矿物自动交易已启用，保留最小数量: ${minAmount}`;
+        // 如果设置了最低价格
+        if (minPrice > 0) {
+            room.memory.autoTrading.resources[resourceType].minPrice = minPrice;
+        }
+        
+        return `房间 ${roomName} 的${resourceType}自动交易已启用，保留最小数量: ${minAmount}${minPrice > 0 ? '，最低价格: ' + minPrice : ''}`;
     },
     
     /**
-     * 禁用K矿物的自动交易
+     * 禁用资源的自动交易
      * @param {string} roomName - 房间名称
+     * @param {string} resourceType - 资源类型
      * @returns {string} - 操作结果信息
      */
-    disableKMineralTrading: function(roomName) {
+    disableResourceTrading: function(roomName, resourceType) {
         const room = Game.rooms[roomName];
         if(!room) {
             return `错误：无法访问房间 ${roomName}`;
@@ -413,9 +444,11 @@ const managerTerminal = {
             return `房间 ${roomName} 没有配置自动交易`;
         }
         
-        // 如果只想禁用K矿物交易
-        if(room.memory.autoTrading.resources[RESOURCE_KEANIUM]) {
-            delete room.memory.autoTrading.resources[RESOURCE_KEANIUM];
+        // 如果只想禁用特定资源交易
+        if(room.memory.autoTrading.resources[resourceType]) {
+            delete room.memory.autoTrading.resources[resourceType];
+        } else {
+            return `房间 ${roomName} 没有配置${resourceType}的自动交易`;
         }
         
         // 检查是否还有其他资源配置了自动交易
@@ -423,7 +456,56 @@ const managerTerminal = {
             room.memory.autoTrading.enabled = false;
         }
         
-        return `房间 ${roomName} 的K矿物自动交易已禁用`;
+        return `房间 ${roomName} 的${resourceType}自动交易已禁用`;
+    },
+    
+    /**
+     * 启用K矿物的自动交易 (兼容旧API)
+     * @param {string} roomName - 房间名称
+     * @param {number} minAmount - 保留的最小K矿物数量
+     * @returns {string} - 操作结果信息
+     */
+    enableKMineralTrading: function(roomName, minAmount = 1000) {
+        return this.enableResourceTrading(roomName, RESOURCE_KEANIUM, minAmount);
+    },
+    
+    /**
+     * 禁用K矿物的自动交易 (兼容旧API)
+     * @param {string} roomName - 房间名称
+     * @returns {string} - 操作结果信息
+     */
+    disableKMineralTrading: function(roomName) {
+        return this.disableResourceTrading(roomName, RESOURCE_KEANIUM);
+    },
+    
+    /**
+     * 获取房间所有已配置的自动交易资源
+     * @param {string} roomName - 房间名称
+     * @returns {string} - 操作结果信息
+     */
+    getConfiguredTradingResources: function(roomName) {
+        const room = Game.rooms[roomName];
+        if(!room) {
+            return `错误：无法访问房间 ${roomName}`;
+        }
+        
+        if(!room.memory.autoTrading || !room.memory.autoTrading.enabled) {
+            return `房间 ${roomName} 未启用自动交易`;
+        }
+        
+        const resources = room.memory.autoTrading.resources;
+        if(Object.keys(resources).length === 0) {
+            return `房间 ${roomName} 未配置任何资源的自动交易`;
+        }
+        
+        let result = `房间 ${roomName} 已配置的自动交易资源:\n`;
+        
+        for(const resourceType in resources) {
+            const config = resources[resourceType];
+            result += `${resourceType}: 最小保留量=${config.minAmount}${config.minPrice ? ', 最低价格=' + config.minPrice : ''}\n`;
+        }
+        
+        return result;
     },
     
     /**
@@ -498,7 +580,114 @@ const managerTerminal = {
                 creep.say('🚫');
             }
         }
+    },
+    
+    /**
+     * 从市场上购买资源
+     * @param {string} roomName - 发起购买的房间名称
+     * @param {ResourceConstant} resourceType - 要购买的资源类型
+     * @param {number} amount - 想要购买的数量
+     * @param {number} maxPrice - 可接受的最高单价
+     * @returns {string} - 操作结果信息
+     */
+    buyFromMarket: function(roomName, resourceType, amount, maxPrice) {
+        const room = Game.rooms[roomName];
+        if(!room) {
+            return `错误：无法访问房间 ${roomName}`;
+        }
+        
+        const terminal = room.terminal;
+        if(!terminal) {
+            return `错误：房间 ${roomName} 没有终端设施`;
+        }
+        
+        if (!resourceType || !amount || amount <= 0 || !maxPrice || maxPrice <= 0) {
+            return `错误：无效的参数。请提供资源类型、购买数量(>0)和最高价格(>0)`;
+        }
+        
+        // 查找符合条件的出售订单
+        const orders = Game.market.getAllOrders({
+            type: ORDER_SELL,
+            resourceType: resourceType
+        });
+        
+        // 过滤价格过高的订单
+        const affordableOrders = orders.filter(order => order.price <= maxPrice);
+        
+        if (affordableOrders.length === 0) {
+            return `市场上没有找到价格低于 ${maxPrice} 的 ${resourceType} 出售订单。`;
+        }
+        
+        // 按价格从低到高排序
+        affordableOrders.sort((a, b) => a.price - b.price);
+        
+        let amountNeeded = amount;
+        let totalBought = 0;
+        let totalCreditsCost = 0;
+        let totalEnergyCost = 0;
+        let messages = [];
+        
+        console.log(`开始为房间 ${roomName} 购买 ${amount} 单位 ${resourceType}，最高价格 ${maxPrice}...`);
+        
+        // 遍历订单并尝试购买
+        for (const order of affordableOrders) {
+            if (amountNeeded <= 0) break; // 已买够
+            
+            const orderAmount = order.remainingAmount;
+            if (orderAmount <= 0) continue; // 跳过空订单
+            
+            // 计算本次交易能买多少
+            const buyAmount = Math.min(amountNeeded, orderAmount, terminal.store.getFreeCapacity(resourceType));
+            
+            if (buyAmount <= 0) {
+                messages.push(`终端容量不足，无法继续购买 ${resourceType}`);
+                break; // 终端满了
+            }
+            
+            // 计算成本
+            const creditsCost = buyAmount * order.price;
+            const energyCost = Game.market.calcTransactionCost(buyAmount, roomName, order.roomName);
+            
+            // 检查资源
+            if (Game.market.credits < creditsCost) {
+                messages.push(`信用点不足以购买 ${buyAmount} ${resourceType} (需要 ${creditsCost.toFixed(2)})`);
+                continue; // 信用点不够，尝试下一个订单
+            }
+            
+            if (terminal.store[RESOURCE_ENERGY] < energyCost) {
+                messages.push(`终端能量不足以支付交易费用 (需要 ${energyCost} 能量)`);
+                // 尝试请求能量补充，但本次跳过
+                this.requestEnergyTransfer(room, energyCost - terminal.store[RESOURCE_ENERGY]);
+                continue; 
+            }
+            
+            // 执行交易
+            const result = Game.market.deal(order.id, buyAmount, roomName);
+            
+            if (result === OK) {
+                amountNeeded -= buyAmount;
+                totalBought += buyAmount;
+                totalCreditsCost += creditsCost;
+                totalEnergyCost += energyCost;
+                messages.push(`成功从订单 ${order.id} 购买 ${buyAmount} ${resourceType} @ ${order.price} Credits/unit.`);
+                console.log(`成功购买 ${buyAmount} ${resourceType} from ${order.roomName}, 耗费 ${creditsCost.toFixed(2)} Cr, ${energyCost} En.`);
+            } else {
+                messages.push(`尝试从订单 ${order.id} 购买 ${buyAmount} ${resourceType} 失败，错误: ${result}`);
+                console.log(`购买失败 (订单 ${order.id}): ${result}`);
+                // 如果是无效订单，可以考虑从内存中删除？但deal失败可能原因很多
+            }
+        }
+        
+        // 返回总结信息
+        let summary = `购买 ${resourceType} 报告 (目标: ${amount}, 最高价: ${maxPrice}):\n`;
+        summary += messages.join('\n');
+        summary += `\n总计购买: ${totalBought} 单位`;
+        summary += `\n总计花费: ${totalCreditsCost.toFixed(2)} Credits, ${totalEnergyCost} Energy`;
+        summary += `\n剩余需求: ${amountNeeded} 单位`;
+        
+        return summary;
     }
 };
 
+global.managerTerminal = managerTerminal;
 module.exports = managerTerminal;

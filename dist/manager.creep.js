@@ -134,7 +134,15 @@ const creepManager = {
         if(role === 'remoteBuilder') {
             memory.dontPullMe = true;
         }
+
+        if(role === 'harvester') {
+            memory.dontPullMe = true;
+        }
         
+        if (role === "terminalHauler") {
+            memory.dontPullMe = true;
+        }
+
         // 对于存储运输者设置storageHauler标记
         if(role === 'remoteHauler' && config.storageHauler) {
             memory.storageHauler = true;
@@ -195,7 +203,7 @@ const creepManager = {
         };
         
         // 对特定角色设置dontPullMe为true，防止被对穿
-        if(['miner', 'builder', 'upgrader', 'mineralHarvester', 'dismantler', 'remoteBuilder'].includes(request.role) && !memory.dontPullMe) {
+        if(['miner', 'builder', 'upgrader', 'harvester', 'mineralHarvester', 'dismantler', 'remoteBuilder', "terminalHauler"].includes(request.role) && !memory.dontPullMe) {
             memory.dontPullMe = true;
         }
         
@@ -261,7 +269,7 @@ const creepManager = {
      */
     getCreepPriorityOrder: function(room, gameStage) {
         // 基本优先级顺序
-        let priorityOrder = ['hauler', 'miner', 'harvester', 'upgrader', 'defender', 'builder', 'repairer', 'wallRepairer', 'claimer', 'dismantler', 'remoteMiner', 'remoteHauler', 'transfer', 'signer', 'remoteBuilder', 'mineralHarvester', 'mineralHauler', 'terminalHauler'];
+        let priorityOrder = ['hauler', 'miner', 'harvester', 'upgrader', 'defender', 'builder', 'repairer', 'wallRepairer', 'claimer', 'dismantler', 'remoteMiner', 'remoteHauler', 'transfer', 'signer', 'remoteBuilder', 'mineralHarvester', 'mineralHauler', 'terminalHauler', "labHauler"];
         
         // 紧急情况的优先级调整
         
@@ -327,11 +335,11 @@ const creepManager = {
         // 根据游戏阶段调整优先级
         if(gameStage.level >= 4) {
             // 高级阶段，矿工、运输者和转运者的优先级提高
-            priorityOrder = ['hauler', 'miner', 'harvester', 'transfer', 'upgrader', 'builder', 'repairer', 'defender', 'wallRepairer', 'mineralHarvester', 'mineralHauler', 'terminalHauler', 'claimer', 'dismantler', 'remoteMiner', 'remoteHauler'];
+            priorityOrder = ['hauler', 'miner', 'harvester', 'transfer', 'upgrader', 'builder', 'repairer', 'defender', 'wallRepairer', 'mineralHarvester', 'mineralHauler', 'terminalHauler', 'claimer', 'dismantler', 'remoteMiner', 'remoteHauler', "labHauler"];
         }
         else if(gameStage.level >= 3) {
             // 中期阶段，矿工和运输者的优先级提高
-            priorityOrder = ['harvester', 'miner', 'hauler', 'upgrader', 'builder', 'repairer', 'defender', 'wallRepairer', 'claimer', 'dismantler', 'remoteMiner', 'remoteHauler', 'transfer', 'mineralHarvester', 'mineralHauler', 'terminalHauler'];
+            priorityOrder = ['harvester', 'miner', 'hauler', 'upgrader', 'builder', 'repairer', 'defender', 'wallRepairer', 'claimer', 'dismantler', 'remoteMiner', 'remoteHauler', 'transfer', 'mineralHarvester', 'mineralHauler', 'terminalHauler', "labHauler"];
         }
         
         return priorityOrder;
@@ -370,7 +378,7 @@ const creepManager = {
         };
         
         // 对特定角色设置dontPullMe为true，防止被对穿
-        if(['miner', 'builder', 'upgrader', 'mineralHarvester', 'dismantler', 'remoteBuilder'].includes(role)) {
+        if(['miner', 'builder', 'upgrader', 'harvester', 'mineralHarvester', 'dismantler', 'remoteBuilder', "terminalHauler"].includes(role)) {
             memory.dontPullMe = true;
         }
         
@@ -397,7 +405,7 @@ const creepManager = {
             const role = creep.memory.role || 'harvester';
             
             // 为特定角色设置dontPullMe属性，防止被对穿
-            if(['miner', 'builder', 'upgrader', 'mineralHarvester', 'dismantler', 'remoteBuilder'].includes(role) && !creep.memory.dontPullMe) {
+            if(['miner', 'builder', 'upgrader', 'harvester', 'mineralHarvester', 'dismantler', 'remoteBuilder', "terminalHauler"].includes(role) && !creep.memory.dontPullMe) {
                 creep.memory.dontPullMe = true;
             }
             

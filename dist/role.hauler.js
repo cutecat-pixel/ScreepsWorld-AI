@@ -17,6 +17,9 @@ const roleHauler = {
         // 状态切换逻辑，带有自定义提示信息
         utils.switchWorkState(creep, '🔄 收集', '📦 运输');
         
+        // 清理过期的hauler分配
+        this.cleanupHaulerAssignments(creep.room);
+        
         // 如果在工作模式（分发能量）
         if(creep.memory.working) {
             // 检查是否已有目标
@@ -50,13 +53,12 @@ const roleHauler = {
                     if(target.store.getFreeCapacity(RESOURCE_ENERGY) <= creep.store.getUsedCapacity(RESOURCE_ENERGY)) {
                         // 目标已满或即将满，清除目标ID以便寻找新目标
                         delete creep.memory.targetId;
+                        
+                        // 如果有分配记录，也清除它
+                        if(creep.room.memory.haulerAssignments && creep.room.memory.haulerAssignments[creep.id]) {
+                            delete creep.room.memory.haulerAssignments[creep.id];
+                        }
                     }
-                }
-            }
-            // 如果所有建筑都满了，考虑升级控制器
-            else if(creep.room.controller) {
-                if(creep.upgradeController(creep.room.controller) === ERR_NOT_IN_RANGE) {
-                    creep.moveTo(creep.room.controller, {visualizePathStyle: {stroke: '#ffffff'}});
                 }
             }
         }
@@ -87,10 +89,10 @@ const roleHauler = {
             
             // 在高级阶段后，如果没有建筑需要能量，不执行收集资源的操作
             if(creep.room.controller.level >= 5 && !energyNeeded) {
-                creep.moveTo(new RoomPosition(25, 25, creep.room.name), {
-                    visualizePathStyle: {stroke: '#ffaa00'},
-                    range: 10
-                });
+                // creep.moveTo(new RoomPosition(25, 25, creep.room.name), {
+                //     visualizePathStyle: {stroke: '#ffaa00'},
+                //     range: 10
+                // });
                 return;
             }
             
@@ -203,6 +205,41 @@ const roleHauler = {
         let targets = [];
         const creepEnergy = creep.store.getUsedCapacity(RESOURCE_ENERGY);
         
+        // 首先检查是否有低能量的塔（能量低于50%）
+        let lowEnergyTowers = creep.room.find(FIND_MY_STRUCTURES, {
+            filter: s => s.structureType === STRUCTURE_TOWER && 
+                      s.store.getFreeCapacity(RESOURCE_ENERGY) > 0 &&
+                      s.store.getUsedCapacity(RESOURCE_ENERGY) < s.store.getCapacity(RESOURCE_ENERGY) * 0.5
+        });
+        
+        if(lowEnergyTowers.length > 0) {
+            // 按能量缺口排序，优先补充能量最少的塔
+            lowEnergyTowers.sort((a, b) => a.store.getUsedCapacity(RESOURCE_ENERGY) - b.store.getUsedCapacity(RESOURCE_ENERGY));
+            
+            // 检查是否有其他hauler正在前往同一个tower，并考虑其运载量
+            const filteredLowTowers = _.filter(lowEnergyTowers, tower => {
+                for(let id in Game.creeps) {
+                    const otherCreep = Game.creeps[id];
+                    if(otherCreep.id !== creep.id && 
+                       otherCreep.memory.role === 'hauler' && 
+                       otherCreep.memory.targetId === tower.id) {
+                        // 如果其他 Creep 的运载量足以填满 Tower 的剩余容量，则此 Tower 不可用
+                        if (tower.store.getFreeCapacity(RESOURCE_ENERGY) <= otherCreep.store.getUsedCapacity(RESOURCE_ENERGY)) {
+                            return false; 
+                        }
+                    }
+                }
+                return true;
+            });
+            
+            // 如果有未分配或单个hauler无法填满的低能量塔，立即选择它并返回
+            if(filteredLowTowers.length > 0) {
+                targets = [filteredLowTowers[0]]; // 选择能量最少的那个可用低能量塔
+                creep.say('🔥塔优先');
+                return targets[0];
+            }
+        }
+        
         // 收集需要能量的spawn和extension，按优先级分组
         // 优先级1：即将孵化的spawn或将满的extension组
         // 优先级2：其他spawn和extension
@@ -250,68 +287,113 @@ const roleHauler = {
                         timestamp: Game.time
                     };
                     
-                    // 最多取与自身能量相当的目标数量
-                    targets = bestGroup.structures.slice(0, Math.ceil(creepEnergy / 50));
+                    // 过滤掉已经被其他hauler预定的extension
+                    const availableStructures = _.filter(bestGroup.structures, ext => {
+                        // 检查是否有其他hauler明确以此extension为目标
+                        for (let id in Game.creeps) {
+                            const otherCreep = Game.creeps[id];
+                            if (otherCreep.id !== creep.id &&
+                                otherCreep.memory.role === 'hauler' &&
+                                otherCreep.memory.targetId === ext.id) {
+                                // 如果其他hauler携带的能量足以填满该extension，则过滤掉
+                                if (ext.store.getFreeCapacity(RESOURCE_ENERGY) <= otherCreep.store.getUsedCapacity(RESOURCE_ENERGY)) {
+                                    return false;
+                                }
+                            }
+                        }
+                        return true;
+                    });
+
+                    // 从可用的structure中选择目标，仍然可以限制数量
+                    targets = availableStructures.slice(0, Math.ceil(creepEnergy / 50));
+                    // 如果过滤后还有目标，可能需要重新找最近的？或者slice后的第一个通常就可以
+                    // 简单起见，暂时维持 slice 逻辑，后续可优化为 findClosestTarget(creep, availableStructures)
                 }
             }
             
-            // 如果没有优先建筑，选择最近的一个
+            
+            // 如果没有优先建筑（Spawning Spawn 或 Extension组），选择最近的一个可用Spawn或Extension
             if(targets.length === 0 && spawnAndExtensions.length > 0) {
-                targets = [this.findClosestTarget(creep, spawnAndExtensions)];
+                 // 过滤掉已经被其他hauler预定的spawn/extension
+                 const availableSpawnExt = _.filter(spawnAndExtensions, target => {
+                     // 仅考虑非spawning的spawn和不在已处理group中的extension（虽然groupExtensionsByPosition已经处理过）
+                     if (target.structureType === STRUCTURE_SPAWN && target.spawning) return false; 
+                     
+                     for (let id in Game.creeps) {
+                         const otherCreep = Game.creeps[id];
+                         if (otherCreep.id !== creep.id &&
+                             otherCreep.memory.role === 'hauler' &&
+                             otherCreep.memory.targetId === target.id) {
+                             if (target.store.getFreeCapacity(RESOURCE_ENERGY) <= otherCreep.store.getUsedCapacity(RESOURCE_ENERGY)) {
+                                 return false;
+                             }
+                         }
+                     }
+                     return true;
+                 });
+
+                 if (availableSpawnExt.length > 0) {
+                    targets = [this.findClosestTarget(creep, availableSpawnExt)];
+                 }
             }
         }
         
-        // 如果没有spawn/extension需要能量，检查tower
+        // 如果没有spawn/extension需要能量，检查普通能量的tower（能量不低于50%的）
         if(targets.length === 0) {
-            let towers = creep.room.find(FIND_MY_STRUCTURES, {
+            let normalTowers = creep.room.find(FIND_MY_STRUCTURES, {
                 filter: s => s.structureType === STRUCTURE_TOWER && 
-                          s.store.getFreeCapacity(RESOURCE_ENERGY) > 0
+                          s.store.getFreeCapacity(RESOURCE_ENERGY) > 0 &&
+                          s.store.getUsedCapacity(RESOURCE_ENERGY) >= s.store.getCapacity(RESOURCE_ENERGY) * 0.5
             });
             
             // 按能量缺口排序，优先补充能量少的塔
-            if(towers.length > 0) {
-                towers.sort((a, b) => a.store.getUsedCapacity(RESOURCE_ENERGY) - b.store.getUsedCapacity(RESOURCE_ENERGY));
+            if(normalTowers.length > 0) {
+                normalTowers.sort((a, b) => a.store.getUsedCapacity(RESOURCE_ENERGY) - b.store.getUsedCapacity(RESOURCE_ENERGY));
                 
-                // 检查是否有其他hauler正在前往同一个tower
-                const filteredTowers = _.filter(towers, tower => {
-                    // 检查内存中是否有其他hauler已分配到这个tower
+                // 检查是否有其他hauler正在前往同一个tower，并考虑其运载量
+                const filteredTowers = _.filter(normalTowers, tower => {
                     for(let id in Game.creeps) {
                         const otherCreep = Game.creeps[id];
                         if(otherCreep.id !== creep.id && 
                            otherCreep.memory.role === 'hauler' && 
                            otherCreep.memory.targetId === tower.id) {
-                            return false;
+                            // 如果其他 Creep 的运载量足以填满 Tower 的剩余容量，则此 Tower 不可用
+                            if (tower.store.getFreeCapacity(RESOURCE_ENERGY) <= otherCreep.store.getUsedCapacity(RESOURCE_ENERGY)) {
+                                return false; 
+                            }
+                            // 注意：这里允许多个hauler同时运送，只要单个hauler不足以填满
                         }
                     }
                     return true;
                 });
                 
-                // 如果有未分配的tower，选择能量最少的一个
+                // 如果有未分配或单个hauler无法填满的tower，选择能量最少的一个
                 if(filteredTowers.length > 0) {
-                    targets = [filteredTowers[0]];
-                } else {
-                    // 如果所有tower都已分配，选择最近的一个
-                    targets = [this.findClosestTarget(creep, towers)];
-                }
+                    targets = [filteredTowers[0]]; // 仍然选择能量最少的那个可用tower
+                } 
+                // 不需要 else 回退到 this.findClosestTarget(creep, towers)，因为原始towers列表未经过容量过滤
             }
             
-            // 检查PowerSpawn是否需要能量，优先级在塔之后，但在储能LINK之前
+            // 检查PowerSpawn是否需要能量
             if(targets.length === 0) {
                 const powerSpawns = creep.room.find(FIND_MY_STRUCTURES, {
                     filter: s => s.structureType === STRUCTURE_POWER_SPAWN && 
                               s.store.getFreeCapacity(RESOURCE_ENERGY) > 0 &&
-                              s.store.getUsedCapacity(RESOURCE_ENERGY) < 2000 // 确保PowerSpawn至少有2000能量用于处理Power
+                              s.store.getUsedCapacity(RESOURCE_ENERGY) < 4000 // 放宽到4000能量以下都需要补充？ 原来是2000
                 });
                 
                 if(powerSpawns.length > 0) {
-                    // 检查是否有其他hauler正在前往PowerSpawn
+                    // 检查是否有其他hauler正在前往PowerSpawn，并考虑其运载量
                     const filteredPowerSpawns = _.filter(powerSpawns, ps => {
                         for(let id in Game.creeps) {
                             const otherCreep = Game.creeps[id];
                             if(otherCreep.id !== creep.id && 
                                otherCreep.memory.role === 'hauler' && 
                                otherCreep.memory.targetId === ps.id) {
-                                return false;
+                                // 如果其他 Creep 的运载量足以填满 Power Spawn 的剩余容量，则此 Power Spawn 不可用
+                                if (ps.store.getFreeCapacity(RESOURCE_ENERGY) <= otherCreep.store.getUsedCapacity(RESOURCE_ENERGY)) {
+                                    return false;
+                                }
                             }
                         }
                         return true;
@@ -328,8 +410,8 @@ const roleHauler = {
                 }
             }
             
-            // 检查与STORAGE相邻的LINK是否需要能量
-            if(targets.length === 0 && creep.room.memory.links && creep.room.memory.links.storage) {
+            // 检查与STORAGE相邻的LINK是否需要能量（仅在控制器等级5时生效）
+            if(targets.length === 0 && creep.room.controller.level === 5 && creep.room.memory.links && creep.room.memory.links.storage) {
                 const storageLink = Game.getObjectById(creep.room.memory.links.storage);
                 
                 if(storageLink && storageLink.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
@@ -507,6 +589,40 @@ const roleHauler = {
     },
     
     /**
+     * 清理过期的hauler分配信息
+     * @param {Room} room - 房间对象
+     */
+    cleanupHaulerAssignments: function(room) {
+        // 如果没有haulerAssignments，直接返回
+        if(!room.memory.haulerAssignments) return;
+        
+        // 每100个tick执行一次全面清理
+        if(Game.time % 100 === 0) {
+            const assignments = room.memory.haulerAssignments;
+            
+            // 遍历所有分配
+            for(const creepId in assignments) {
+                // 检查creep是否还存在
+                if(!Game.getObjectById(creepId)) {
+                    // creep不存在，删除分配
+                    delete assignments[creepId];
+                } else {
+                    // 检查分配是否过期（超过100个tick）
+                    const assignment = assignments[creepId];
+                    if(Game.time - assignment.timestamp > 100) {
+                        delete assignments[creepId];
+                    }
+                }
+            }
+            
+            // 如果清理后没有分配，删除整个haulerAssignments对象
+            if(Object.keys(assignments).length === 0) {
+                delete room.memory.haulerAssignments;
+            }
+        }
+    },
+    
+    /**
      * 根据游戏阶段和可用能量返回适合的身体部件
      * @param {number} energy - 可用能量
      * @param {Object} gameStage - 游戏阶段对象
@@ -516,7 +632,7 @@ const roleHauler = {
         let body = [];
         
         // 运输者主要需要CARRY和MOVE部件
-        if(gameStage.level >= 7 && energy >= 1800) {
+        if(gameStage.level >= 7 && energy >= 1700) {
             // 后期阶段配置，更大容量
             body = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY,
                    CARRY, CARRY, CARRY, CARRY, CARRY,

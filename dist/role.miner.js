@@ -26,6 +26,56 @@ const roleMiner = {
             filter: s => s.structureType === STRUCTURE_CONTAINER
         });
         
+        // 查找源点附近的LINK
+        const links = source.pos.findInRange(FIND_MY_STRUCTURES, 2, {
+            filter: s => s.structureType === STRUCTURE_LINK
+        });
+        
+        // 检查源点是否冷却或没有能量
+        const sourceEmpty = source.energy === 0;
+        
+        // 如果源点冷却/没能量，且矿工有CARRY部件，检查容器能量
+        if(sourceEmpty && creep.getActiveBodyparts(CARRY) > 0 && containers.length > 0 && links.length > 0) {
+            const container = containers[0];
+            
+            // 如果容器有能量且矿工没满
+            if(container.store.getUsedCapacity(RESOURCE_ENERGY) > 0 && creep.store.getFreeCapacity() > 0) {
+                // 移动到容器并从中拾取能量
+                if(!creep.pos.isEqualTo(container.pos)) {
+                    creep.moveTo(container, {visualizePathStyle: {stroke: '#ffaa00'}});
+                } else {
+                    creep.withdraw(container, RESOURCE_ENERGY);
+                }
+            }
+            // 如果矿工背包有能量，将能量传输到LINK
+            else if(creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                if(creep.transfer(links[0], RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                    creep.moveTo(links[0], {visualizePathStyle: {stroke: '#ffaa00'}});
+                }
+            }
+            return;
+        }
+        
+        // 检查是否有CARRY部件且能量已满
+        if(creep.getActiveBodyparts(CARRY) > 0 && creep.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+            // 如果有LINK，优先传输到LINK
+            if(links.length > 0) {
+                if(creep.transfer(links[0], RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                    creep.moveTo(links[0], {visualizePathStyle: {stroke: '#ffaa00'}});
+                }
+                return;
+            } else if(containers.length > 0) {
+                // 如果没有LINK，传输到容器
+                if(creep.transfer(containers[0], RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                    creep.moveTo(containers[0], {visualizePathStyle: {stroke: '#ffaa00'}});
+                }
+                return;
+            } else {
+                // 如果既没有LINK也没有容器，扔到地上
+                creep.drop(RESOURCE_ENERGY);
+            }
+        }
+        
         // 如果附近有容器
         if(containers.length > 0) {
             const container = containers[0];
@@ -209,9 +259,11 @@ const roleMiner = {
      */
     getBody: function(energy, gameStage) {
         let body = [];
-        
+        if (gameStage.level >=6 && energy >= 900) {
+            body = [WORK, WORK, WORK, WORK, WORK, WORK, CARRY, CARRY, MOVE, MOVE, MOVE]
+        }
         // 矿工主要需要WORK部件和少量MOVE部件
-        if(gameStage.level >= 4 && energy >= 700) {
+        else if(gameStage.level >= 4 && energy >= 700) {
             // 高级阶段配置，大量WORK部件
             body = [WORK, WORK, WORK, WORK, WORK, MOVE, MOVE];
         }

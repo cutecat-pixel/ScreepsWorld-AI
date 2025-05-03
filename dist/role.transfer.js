@@ -4,6 +4,7 @@ const utils = require('utils');
 const CONTAINER_LOW_ENERGY_THRESHOLD = 500; // 当分配的容器能量低于此值时，transfer可能变为空闲
 const HELP_TARGET_MIN_ENERGY = 1200;       // 帮助目标容器至少需要多少能量
 const MIN_WITHDRAW_AMOUNT = 1200;             // 帮助或收集时目标至少需要的能量
+const LINK_CHECK_RANGE = 2;                 // 检查Container附近多远范围内的LINK
 
 /**
  * 转运者角色模块
@@ -11,6 +12,7 @@ const MIN_WITHDRAW_AMOUNT = 1200;             // 帮助或收集时目标至少�
  * 当房间有 Storage 时：
  *   - 每个 Transfer Creep 会被分配一个 Container，专门负责将其中的能量搬运到 Storage。
  *   - 会优先收集/存储非能量资源（来自墓碑/掉落物）。
+ *   - 不处理附近有LINK的Container，那些由LINK网络负责传输能量。
  * 当房间没有 Storage 时：
  *   - 从容器、掉落物、墓碑收集能量/化合物，优先化合物。
  *   - 将资源存入 Storage（如果后来建了）或 Spawn/Extension/Tower，或用于升级。
@@ -29,53 +31,34 @@ const roleTransfer = {
         if (storage && !room.memory.assignedContainers) {
             room.memory.assignedContainers = [];
         }
-        // 清理无效的已分配容器ID (可选，但推荐)
-        // if (storage && Game.time % 100 === 0) { // 每100 tick清理一次
-        //      room.memory.assignedContainers = room.memory.assignedContainers.filter(id => Game.getObjectById(id));
-        // }
 
-        // 检查是否携带了任何非能量资源
-        let hasNonEnergyResources = false;
-        let nonEnergyType = '';
-        for(const resourceType in creep.store) {
-            if(resourceType !== RESOURCE_ENERGY && creep.store[resourceType] > 0) {
-                hasNonEnergyResources = true;
-                nonEnergyType = resourceType;
-                break;
-            }
-        }
+        // 优先处理非能量收集
+        const nonEnergyStatus = this.collectNonEnergy(creep);
         
-        // 如果携带了化合物，强制进入工作模式去存储 (无论是否有Storage)
-        if(hasNonEnergyResources && !creep.memory.working) {
-            creep.memory.working = true;
-            creep.say('📦 ' + nonEnergyType.substring(0,2));
-        } else if (!hasNonEnergyResources) {
-            // 仅在不携带化合物时才进行常规状态切换
-            utils.switchWorkState(creep, '🔄', '📦');
+        // 如果正在移动去收集或正在积极收集中，则本tick结束
+        if (nonEnergyStatus === 'MOVING' || nonEnergyStatus === 'COLLECTING_ACTIVE') {
+            return;
         }
-        
+
+        // 根据容量和非能量收集状态决定工作状态
+        if (creep.store.getUsedCapacity() > 0 || nonEnergyStatus === 'FULL') {
+           creep.memory.working = true;
+        } else {
+           creep.memory.working = false;
+           // 清理非工作状态下的记忆
+           delete creep.memory.collectingNonEnergyTarget;
+           delete creep.memory.helpingContainerId;
+           // 如果是从 FULL 状态转换过来的，working 会在下一 tick 开始时设置为 false
+        }
+
         // --- 主要逻辑分支 ---
         if (creep.memory.working) {
-            // 存储模式：优先存储化合物，然后是能量
-            this.storeResources(creep, storage, hasNonEnergyResources);
-            // 在存储完成后，检查是否之前在帮助，如果是，则清除帮助标记
-            if (creep.store.getUsedCapacity() === 0 && creep.memory.helpingContainerId) {
-                // console.log(`${creep.name} 完成帮助 ${creep.memory.helpingContainerId} 的运送，清除标记`);
-                delete creep.memory.helpingContainerId;
-            }
-        } else {
-            // 收集模式
-            // 总是优先检查并拾取地上的非能量资源或墓碑中的非能量资源
-            if (this.collectNonEnergy(creep)) {
-                 return; 
-            }
-            
-            // 如果没有非能量资源要处理，根据是否有 Storage 决定收集策略
+            // 存储模式
+            this.storeResources(creep, storage);
+        } else { // 只有在非工作状态，且非能量收集返回 false 时才收集能量
             if (storage) {
-                // 有 Storage：检查是否正在帮助，或是否应该去帮助，或从自己分配的 Container 收集
                 this.collectEnergyWithHelpLogic(creep, storage);
             } else {
-                // 无 Storage：使用旧的能量收集逻辑
                 this.collectEnergyLegacy(creep);
             }
         }
@@ -85,47 +68,43 @@ const roleTransfer = {
      * 存储资源的逻辑 (优先非能量)
      * @param {Creep} creep
      * @param {StructureStorage} storage - 可能为 null
-     * @param {boolean} hasNonEnergyResources
      */
-    storeResources: function(creep, storage, hasNonEnergyResources) {
+    storeResources: function(creep, storage) {
         let target = null;
         let resourceToStore = null;
         
-        // 确定要存储的资源类型 (优先非能量)
-        if (hasNonEnergyResources) {
-            for(const type in creep.store) {
-                if(type !== RESOURCE_ENERGY && creep.store[type] > 0) {
-                    resourceToStore = type;
-                    break;
-                }
+        // 查找第一个要存储的资源 (优先非能量)
+        for(const type in creep.store) {
+            if(type !== RESOURCE_ENERGY && creep.store[type] > 0) {
+                resourceToStore = type;
+                break;
             }
-        } 
-        // 如果没有非能量或已存完，存能量
+        }
+        // 如果没有非能量资源，检查是否有能量
         if (!resourceToStore && creep.store[RESOURCE_ENERGY] > 0) {
             resourceToStore = RESOURCE_ENERGY;
         }
         
-        // 如果无资源可存，切换状态 (可能发生在捡了东西但下一tick又没了？)
+        // 如果无资源可存 (理论上不应发生)，重置状态
         if (!resourceToStore) {
-             creep.memory.working = false;
+             creep.memory.working = false; 
              return;
         }
         
-        // 确定存储目标
+        // 确定存储目标 (优先Storage)
         if (storage) {
             target = storage;
         } else if (resourceToStore === RESOURCE_ENERGY) {
-            // 没有 Storage 时，能量可以存到 Spawn/Extension/Tower
+            // 无Storage时，能量存入其他建筑
             target = utils.findEnergyNeededStructure(creep.room);
         }
-        // 如果是非能量资源且没有Storage，或者能量无处可存，去预设位置或升级
+        // 如果是非能量资源且无Storage，或能量无处可存
         if (!target) {
             if (resourceToStore !== RESOURCE_ENERGY) {
-                 // 移动到预设的矿物存储点
                 creep.say('❌ Store ' + resourceToStore.substring(0,2));
-                const mineralPos = creep.room.memory.mineralStoragePos || { x: 25, y: 25 }; // 默认房间中心
+                const mineralPos = creep.room.memory.mineralStoragePos || { x: 25, y: 25 }; 
                 creep.moveTo(new RoomPosition(mineralPos.x, mineralPos.y, creep.room.name), { visualizePathStyle: { stroke: '#ff0000' }, range: 1 });
-                return; // 无法转移，只能移动过去
+                return;
             } else {
                  // 能量无处可放，尝试升级
                 target = creep.room.controller;
@@ -137,69 +116,138 @@ const roleTransfer = {
         }
 
         // 执行存储
-        creep.say('📦 ' + resourceToStore.substring(0,2));
+        creep.say('📦' + resourceToStore.substring(0,2));
         const result = creep.transfer(target, resourceToStore);
         if (result === ERR_NOT_IN_RANGE) {
             creep.moveTo(target, { visualizePathStyle: { stroke: resourceToStore === RESOURCE_ENERGY ? '#ffffff' : '#ff00ff' } });
         } else if (result === ERR_FULL) {
-            creep.say('⛔ Full');
-            // 如果是 Storage 满了，没办法，等待
-            // 如果是其他建筑满了，下一 tick storeResources 会重新找目标
+            creep.say('⛔');
         } else if (result !== OK) {
             console.log(`Transfer ${creep.name} 存储 ${resourceToStore} 到 ${target.structureType || 'controller'} 失败: ${result}`);
         }
-        // 如果 transfer 成功，下一tick状态检查时，如果没东西了，会自动切换回 collecting
     },
 
     /**
      * 优先收集非能量资源 (墓碑/掉落物)
      * @param {Creep} creep 
-     * @returns {boolean} 是否成功拾取/提取了非能量资源 (如果成功，状态会切换到 working)
+     * @returns {string|false} 返回状态: 'MOVING', 'COLLECTING_ACTIVE', 'FULL', false
      */
     collectNonEnergy: function(creep) {
-        // 1. 高优先级：查找包含化合物的坟墓
+        // 如果已满，直接返回false，让run函数处理
+        if (creep.store.getFreeCapacity() === 0) {
+            return false;
+        }
+        
+        let targetSource = null;
+        let targetType = null; // 'tombstone' or 'dropped'
+        
+        // 优先找包含化合物的坟墓
         const tombstonesWithMinerals = creep.room.find(FIND_TOMBSTONES, {
             filter: tomb => Object.keys(tomb.store).some(r => r !== RESOURCE_ENERGY && tomb.store[r] > 0)
         });
         
         if(tombstonesWithMinerals.length > 0) {
-            tombstonesWithMinerals.sort((a, b) => b.ticksToDecay - a.ticksToDecay); // 优先快消失的
-            const targetTomb = tombstonesWithMinerals[0];
-            let mineralType = Object.keys(targetTomb.store).find(r => r !== RESOURCE_ENERGY && targetTomb.store[r] > 0);
-            
-            if(mineralType) {
-                creep.say('💎' + mineralType.substring(0, 2));
-                const result = creep.withdraw(targetTomb, mineralType);
-                if(result === ERR_NOT_IN_RANGE) {
-                    creep.moveTo(targetTomb, { visualizePathStyle: { stroke: '#ff00ff' } });
-                } else if(result === OK) {
-                    creep.memory.working = true; // 立即切换到存储
-                    return true;
+            targetSource = creep.pos.findClosestByPath(tombstonesWithMinerals);
+            targetType = 'tombstone';
+        }
+        
+        // 如果没有合适的坟墓，找掉落的化合物
+        if(!targetSource) {
+            const droppedMinerals = creep.room.find(FIND_DROPPED_RESOURCES, {
+                filter: r => r.resourceType !== RESOURCE_ENERGY
+            });
+            if(droppedMinerals.length > 0) {
+                targetSource = creep.pos.findClosestByPath(droppedMinerals);
+                targetType = 'dropped';
+            }
+        }
+        
+        // 如果没有找到目标，返回false
+        if (!targetSource) {
+            delete creep.memory.collectingNonEnergyTarget; // 清理可能残留的目标
+            return false;
+        }
+        
+        // 如果当前目标和内存中记录的不一致，可能是旧目标消失了，重新评估
+        if (creep.memory.collectingNonEnergyTarget && creep.memory.collectingNonEnergyTarget !== targetSource.id) {
+            delete creep.memory.collectingNonEnergyTarget;
+            return false; // 让下一tick重新寻找
+        }
+        
+        creep.memory.collectingNonEnergyTarget = targetSource.id;
+        
+        // 如果不在目标旁边，移动过去
+        if (!creep.pos.isNearTo(targetSource)) {
+            creep.moveTo(targetSource, { visualizePathStyle: { stroke: '#ff00ff' } });
+            creep.say('💎 Go');
+            return 'MOVING'; // 正在移动
+        }
+        
+        // 在目标旁边，尝试收集所有非能量资源
+        let collectedSomethingThisTick = false;
+        
+        if (targetType === 'tombstone') {
+            for (const resourceType in targetSource.store) {
+                if (resourceType !== RESOURCE_ENERGY && targetSource.store[resourceType] > 0) {
+                    const amountToWithdraw = Math.min(targetSource.store[resourceType], creep.store.getFreeCapacity());
+                    if (amountToWithdraw > 0) {
+                        const result = creep.withdraw(targetSource, resourceType, amountToWithdraw);
+                        if (result === OK) {
+                            creep.say('💎+' + resourceType.substring(0, 2));
+                            collectedSomethingThisTick = true;
+                            // 检查是否满了
+                            if (creep.store.getFreeCapacity() === 0) {
+                                delete creep.memory.collectingNonEnergyTarget; // 完成收集
+                                return 'FULL'; // 收集后满了
+                            }
+                        } else if (result === ERR_FULL) {
+                            delete creep.memory.collectingNonEnergyTarget; // 完成收集（因为满了）
+                            return 'FULL'; // 尝试收集但发现已满
+                        } else if (result !== ERR_NOT_ENOUGH_RESOURCES) {
+                             console.log(`${creep.name} withdraw ${resourceType} from tombstone failed: ${result}`);
+                             // 如果出错，暂时跳过这种资源
+                        }
+                        // 如果是ERR_NOT_ENOUGH_RESOURCES，继续尝试下一种资源
+                    } else if (creep.store.getFreeCapacity() === 0) {
+                         delete creep.memory.collectingNonEnergyTarget; // 完成收集
+                        return 'FULL'; // 容量不足，无法收集更多
+                    }
                 }
-                return true; // 正在前往或尝试交互，阻止后续能量收集逻辑
+            }
+        } else if (targetType === 'dropped') {
+            // 掉落的资源一次只能捡一种
+            const result = creep.pickup(targetSource);
+            if (result === OK) {
+                creep.say('💎+' + targetSource.resourceType.substring(0, 2));
+                collectedSomethingThisTick = true;
+                 delete creep.memory.collectingNonEnergyTarget; // 捡起后目标消失
+                // 检查是否满了
+                if (creep.store.getFreeCapacity() === 0) {
+                    return 'FULL'; // 收集后满了
+                }
+            } else if (result === ERR_FULL) {
+                 delete creep.memory.collectingNonEnergyTarget; // 目标还在，但自己满了
+                return 'FULL'; // 尝试收集但发现已满
+            } else if (result === ERR_INVALID_TARGET) { // 目标可能已被别人捡走
+                 delete creep.memory.collectingNonEnergyTarget;
+                 return false; // 目标无效，结束收集
+            } else {
+                 console.log(`${creep.name} pickup ${targetSource.resourceType} failed: ${result}`);
+                 // 其他错误，也结束本次尝试
+                 delete creep.memory.collectingNonEnergyTarget;
+                 return false;
             }
         }
         
-        // 2. 查找掉落的化合物资源
-        const droppedMinerals = creep.room.find(FIND_DROPPED_RESOURCES, {
-            filter: r => r.resourceType !== RESOURCE_ENERGY
-        });
-        
-        if(droppedMinerals.length > 0) {
-            droppedMinerals.sort((a, b) => b.amount - a.amount);
-            const targetMineral = droppedMinerals[0];
-            creep.say('💎' + targetMineral.resourceType.substring(0, 2));
-            const result = creep.pickup(targetMineral);
-            if(result === ERR_NOT_IN_RANGE) {
-                creep.moveTo(targetMineral, { visualizePathStyle: { stroke: '#ff00ff' } });
-            } else if(result === OK) {
-                creep.memory.working = true; // 立即切换到存储
-                return true;
-            }
-            return true; // 正在前往或尝试交互
+        // 检查收集后状态
+        if (collectedSomethingThisTick) {
+            // 成功收集了东西，可能还有（如果是墓碑），继续保持收集状态
+            return 'COLLECTING_ACTIVE';
+        } else {
+            // 在目标旁边，但本tick没有收集到任何东西（墓碑空了或掉落物消失）
+            delete creep.memory.collectingNonEnergyTarget;
+            return false;
         }
-        
-        return false; // 没有找到或处理非能量资源
     },
     
     /**
@@ -214,13 +262,11 @@ const roleTransfer = {
             // 验证帮助目标是否仍然有效且有足够能量
             if (helpingContainer && helpingContainer.store[RESOURCE_ENERGY] >= this.MIN_WITHDRAW_AMOUNT) { 
                 this.withdrawFromTarget(creep, helpingContainer, '#00ff00'); // 绿色路径表示帮助
-                creep.say('🤝 Helping'); // 更清晰的Say
+                creep.say('🤝'); // 更清晰的Say
                 return;
             } else {
                 // 帮助目标无效或没能量了，清除帮助状态
-                // console.log(`${creep.name} 的帮助目标 ${creep.memory.helpingContainerId} 无效或为空，停止帮助`);
                 delete creep.memory.helpingContainerId;
-                // 继续执行下面的逻辑，可能会重新分配自己的 container 或再次寻找帮助目标
             }
         }
 
@@ -229,14 +275,12 @@ const roleTransfer = {
         let container = assignedContainerId ? Game.getObjectById(assignedContainerId) : null;
 
         // 检查分配的 Container 是否有效
-        if (!container) { // 不检查能量是否为0，因为即使为0也可能需要去检查是否该帮助别人
-            // 如果 Container 无效，清除分配 (如果之前有分配的话)
+        if (!container) {
             if (assignedContainerId) {
                  this.unassignContainer(creep.room, assignedContainerId);
                  delete creep.memory.assignedContainerId;
                  assignedContainerId = null;
             }
-            // console.log(`${creep.name} 的 Container 无效，解除分配`);
         }
 
         // 3. 如果没有分配的 Container，尝试寻找并分配一个
@@ -244,12 +288,10 @@ const roleTransfer = {
             container = this.findAndAssignContainer(creep, storage);
             if (container) {
                 assignedContainerId = container.id; 
-                // 分配成功后，直接尝试从新分配的container取货
-                 this.withdrawFromTarget(creep, container, '#ffaa00'); // 黄色路径表示前往自己的新目标
-                 creep.say('🎯 New C');
+                 this.withdrawFromTarget(creep, container, '#ffaa00');
+                 creep.say('🎯');
                  return;
             } else {
-                 // 没有可分配的 Container，在 Storage 附近等待
                 this.idleWaitNearStorage(creep, storage, '⏳ No Cont');
                 return; 
             }
@@ -261,18 +303,14 @@ const roleTransfer = {
             
             // 检查能量是否过低，且自己是空的，可以考虑去帮助
             if (currentEnergy < CONTAINER_LOW_ENERGY_THRESHOLD && creep.store.getUsedCapacity() === 0) {
-                // console.log(`${creep.name} 的 Container ${assignedContainerId} 能量 (${currentEnergy}) 低，尝试寻找帮助目标`);
                 const helpTargetContainer = this.findHelpTarget(creep, storage);
                 if (helpTargetContainer) {
                     creep.memory.helpingContainerId = helpTargetContainer.id;
-                    // console.log(`${creep.name} 找到帮助目标 ${helpTargetContainer.id}，前往帮助`);
-                    this.withdrawFromTarget(creep, helpTargetContainer, '#00ff00'); // 前往帮助目标
-                    creep.say('🤝 Go Help'); // 更清晰的Say
+                    this.withdrawFromTarget(creep, helpTargetContainer, '#00ff00');
+                    creep.say('🤝');
                     return;
                 } else {
-                     // 自己的 Container 能量低，也没找到可帮助的，就在 Storage 附近等待
-                     // console.log(`${creep.name} 未找到帮助目标，在 Storage 附近等待`);
-                     this.idleWaitNearStorage(creep, storage, '⏳ Idle Low'); // 更清晰的Say
+                     this.idleWaitNearStorage(creep, storage, '⏳');
                      return;
                 }
             } else {
@@ -297,18 +335,16 @@ const roleTransfer = {
         } else if (result === ERR_NOT_ENOUGH_RESOURCES) {
             // 目标空了
             if (creep.memory.helpingContainerId === targetContainer.id) {
-                // 如果是帮助目标空了，清除帮助状态
                 delete creep.memory.helpingContainerId;
                 creep.say('🤝');
             } else if (creep.memory.assignedContainerId === targetContainer.id) {
-                 // 如果是自己的 Container 空了，清除分配状态
                  this.unassignContainer(creep.room, targetContainer.id);
                  delete creep.memory.assignedContainerId;
                  creep.say(' C empty');
-                 // 此时应该去寻找新的分配或帮助目标
             }
-        } else if (result !== OK) {
-            console.log(`${creep.name} 从 ${targetContainer.id} withdraw 失败: ${result}`);
+        } else if (result === ERR_FULL) {
+            // 自己满了，应该切换到 working 状态
+             creep.memory.working = true;
         }
     },
 
@@ -325,18 +361,26 @@ const roleTransfer = {
             filter: s => s.structureType === STRUCTURE_CONTAINER && s.store.getUsedCapacity(RESOURCE_ENERGY) > 50
         });
         
-        const unassignedContainers = allContainers.filter(c => 
-            !creep.room.memory.assignedContainers.includes(c.id)
-        );
+        // 过滤出未分配且附近没有LINK的Container
+        const eligibleContainers = allContainers.filter(container => {
+            const isUnassigned = !creep.room.memory.assignedContainers.includes(container.id);
+            if(!isUnassigned) return false;
+            
+            const nearbyLinks = container.pos.findInRange(FIND_MY_STRUCTURES, LINK_CHECK_RANGE, {
+                filter: s => s.structureType === STRUCTURE_LINK
+            });
+            
+            return nearbyLinks.length === 0;
+        });
         
-        if (unassignedContainers.length > 0) {
-            const targetContainer = creep.pos.findClosestByPath(unassignedContainers);
+        if (eligibleContainers.length > 0) {
+            const targetContainer = creep.pos.findClosestByPath(eligibleContainers);
             if (targetContainer) {
                 creep.memory.assignedContainerId = targetContainer.id;
                 creep.room.memory.assignedContainers.push(targetContainer.id);
                 return targetContainer;
             } else {
-                creep.say('🚧 No Path');
+                creep.say('🚧');
                 return null;
             }
         } else {
@@ -362,12 +406,7 @@ const roleTransfer = {
              );
              
         if (potentialTargets.length > 0) {
-            // 选择策略：能量最多的？最近的？
-            // 简单起见，选最近的
              return creep.pos.findClosestByPath(potentialTargets);
-             // 或者选能量最多的：
-             // potentialTargets.sort((a,b) => b.store[RESOURCE_ENERGY] - a.store[RESOURCE_ENERGY]);
-             // return potentialTargets[0];
         }
         
         return null;
@@ -390,7 +429,7 @@ const roleTransfer = {
      * @param {StructureStorage} storage
      * @param {string} sayMsg 
      */
-    idleWaitNearStorage: function(creep, storage, sayMsg = '⏳ Wait') {
+    idleWaitNearStorage: function(creep, storage, sayMsg = '⏳') {
         creep.say(sayMsg);
         if (storage && !creep.pos.isNearTo(storage)) {
             creep.moveTo(storage, { visualizePathStyle: { stroke: '#cccccc' }, range: 3 });
@@ -402,35 +441,29 @@ const roleTransfer = {
      * @param {Creep} creep - 要控制的creep对象
      */
     collectEnergyLegacy: function(creep) {
-        // 优先考虑从容器、墓碑或掉落的资源中获取能量
         let source = null;
         
-        // 查找装满能量的容器
         const containers = creep.room.find(FIND_STRUCTURES, {
             filter: s => s.structureType === STRUCTURE_CONTAINER && 
-                      s.store.getUsedCapacity(RESOURCE_ENERGY) > creep.store.getFreeCapacity(RESOURCE_ENERGY)
+                      s.store.getUsedCapacity(RESOURCE_ENERGY) > creep.store.getFreeCapacity()
         });
         
-        // 按照能量量排序容器
         if(containers.length > 0) {
             containers.sort((a, b) => b.store.getUsedCapacity(RESOURCE_ENERGY) - a.store.getUsedCapacity(RESOURCE_ENERGY));
             source = containers[0];
         }
         
-        // 如果没有合适的容器，查找掉落的能量
         if(!source) {
             const droppedResources = creep.room.find(FIND_DROPPED_RESOURCES, {
                 filter: r => r.resourceType === RESOURCE_ENERGY && r.amount > 0
             });
             
             if(droppedResources.length > 0) {
-                // 按照数量排序资源
                 droppedResources.sort((a, b) => b.amount - a.amount);
                 source = droppedResources[0];
             }
         }
         
-        // 如果没有掉落的资源，查找有能量的墓碑
         if(!source) {
             const tombstones = creep.room.find(FIND_TOMBSTONES, {
                 filter: t => t.store.getUsedCapacity(RESOURCE_ENERGY) > 0
@@ -441,24 +474,21 @@ const roleTransfer = {
             }
         }
         
-        // 如果找到了能量源
         if(source) {
             let actionResult;
             
-            // 根据源类型执行不同的操作
             if(source.store) {
-                // 容器或墓碑
                 actionResult = creep.withdraw(source, RESOURCE_ENERGY);
             } else {
-                // 掉落的资源
                 actionResult = creep.pickup(source);
             }
             
             if(actionResult === ERR_NOT_IN_RANGE) {
                 creep.moveTo(source, {visualizePathStyle: {stroke: '#ffaa00'}});
+            } else if (actionResult === ERR_FULL) {
+                 creep.memory.working = true;
             }
         }
-        // 如果找不到能量源，移动到房间中心等待
         else {
             creep.moveTo(new RoomPosition(25, 25, creep.room.name), {
                 visualizePathStyle: {stroke: '#ffaa00'},
@@ -476,9 +506,7 @@ const roleTransfer = {
     getBody: function(energy, gameStage) {
         let body = [];
         
-        // 转运者主要需要CARRY和MOVE部件
         if(gameStage.level >= 7 && energy >= 1800) {
-            // 后期阶段配置，更大容量
             body = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY,
                    CARRY, CARRY, CARRY, CARRY, CARRY,
                    MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE,
@@ -489,17 +517,14 @@ const roleTransfer = {
                 MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE];
             }
         else if(gameStage.level >= 4 && energy >= 800) {
-            // 高级阶段配置，大量CARRY和匹配的MOVE
             body = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, 
                    MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE];
         }
         else if(gameStage.level >= 3 && energy >= 500) {
-            // 中级阶段配置
             body = [CARRY, CARRY, CARRY, CARRY, CARRY, 
                    MOVE, MOVE, MOVE, MOVE, MOVE];
         }
         else {
-            // 基础配置
             body = [CARRY, CARRY, CARRY, MOVE, MOVE, MOVE];
         }
         

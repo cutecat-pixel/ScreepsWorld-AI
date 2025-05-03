@@ -26,8 +26,16 @@ const roleHarvester = {
             }
             // 如果除STORAGE外的建筑都不缺能量
             else {
-                // 去升级控制器
-                if(creep.room.controller) {
+                // 查找建筑工地
+                const constructionSite = creep.pos.findClosestByPath(FIND_CONSTRUCTION_SITES);
+                if(constructionSite) {
+                    // 尝试建造
+                    if(creep.build(constructionSite) === ERR_NOT_IN_RANGE) {
+                        creep.moveTo(constructionSite, {visualizePathStyle: {stroke: '#ffffff'}});
+                    }
+                } 
+                // 没有建筑工地，升级控制器
+                else {
                     if(creep.upgradeController(creep.room.controller) === ERR_NOT_IN_RANGE) {
                         creep.moveTo(creep.room.controller, {visualizePathStyle: {stroke: '#ffffff'}});
                     }

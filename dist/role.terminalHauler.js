@@ -1,6 +1,7 @@
 /**
  * 终端运输者角色模块
  * 负责处理终端相关的物流任务，包括从Storage向Terminal运输资源和能量
+ * 以及管理STORAGE和CONTROLLER附近的LINK能量传输
  */
 const roleTerminalHauler = {
     /**
@@ -8,6 +9,7 @@ const roleTerminalHauler = {
      * @param {Creep} creep - 要控制的creep对象
      */
     run: function(creep) {
+        
         // 如果没有目标任务，获取一个新任务
         if(!creep.memory.taskId) {
             this.getNewTask(creep);
@@ -17,6 +19,15 @@ const roleTerminalHauler = {
         if(creep.memory.taskId) {
             this.processTask(creep);
         } else {
+            // 如果creep携带资源，应该先存放资源
+            if(creep.store.getUsedCapacity() > 0) {
+                this.idleBehavior(creep);
+                return;
+            }
+            // 检查是否需要处理LINK能量传输任务
+            if(this.checkAndHandleLinkEnergy(creep)) {
+                return; // 如果在处理LINK能量任务，直接返回
+            }
             // 闲置时移动到终端附近等待
             const terminal = creep.room.terminal;
             if(terminal) {
@@ -64,7 +75,7 @@ const roleTerminalHauler = {
                 creep.memory.taskAmount = originalTask.amount; // 记录最初需要处理的总量
                 creep.memory.taskFrom = originalTask.from;
                 creep.memory.taskTo = originalTask.to;
-                creep.say('✅ New Task');
+                creep.say('✅');
                 // console.log(`Creep ${creep.name} 接受了终端任务 ${originalTask.id}`);
                 return; // 找到任务，退出循环
             }
@@ -187,7 +198,7 @@ const roleTerminalHauler = {
             const result = creep.withdraw(fromStructure, resource, amountToWithdraw);
             if(result === ERR_NOT_IN_RANGE) {
                 creep.moveTo(fromStructure, {visualizePathStyle: {stroke: '#ffaa00'}});
-                creep.say('🚚 Pickup');
+                creep.say('🚚');
             } else if (result === ERR_NOT_ENOUGH_RESOURCES) {
                 // 刚检查还有，现在没了？可能是并发问题或计算错误
                 console.log(`Creep ${creep.name} withdraw ${resource} from ${fromType} failed: ERR_NOT_ENOUGH_RESOURCES (Race condition?)`);
@@ -236,7 +247,7 @@ const roleTerminalHauler = {
                 const result = creep.transfer(toStructure, resource);
                 if(result === ERR_NOT_IN_RANGE) {
                     creep.moveTo(toStructure, {visualizePathStyle: {stroke: '#ffffff'}});
-                    creep.say('📦 Deliver');
+                    creep.say('📦');
                 } else if (result === ERR_FULL) {
                     // 目标满了，无法完成转移
                     console.log(`Creep ${creep.name} transfer ${resource} to ${toType} failed: ERR_FULL`);
@@ -296,7 +307,7 @@ const roleTerminalHauler = {
         
         // 清除creep的任务记忆
         this.clearCreepMemory(creep);
-        creep.say('✓ Done');
+        creep.say('✓');
     },
     
     /**
@@ -342,15 +353,44 @@ const roleTerminalHauler = {
                         break;
                     }
                 }
-            } else {
-                // 如果没有storage，移动到房间中心等待
-                creep.moveTo(new RoomPosition(25, 25, creep.room.name), {
-                    visualizePathStyle: {stroke: '#ffaa00'},
-                    range: 5
-                });
             }
         } else {
-            // 如果没有任何资源，移动到房间中心等待
+            // 检查是否需要处理LINK能量传输任务
+            if(creep.room.memory.links && creep.room.storage) {
+                const storageLink = Game.getObjectById(creep.room.memory.links.storage);
+                const controllerLink = Game.getObjectById(creep.room.memory.links.controller);
+                
+                if(storageLink && controllerLink) {
+                    // 输出调试信息
+                    if(Game.time % 30 === 0) {
+                        console.log(`房间${creep.room.name} - Controller LINK能量: ${controllerLink.store.getUsedCapacity(RESOURCE_ENERGY)}, Storage LINK空间: ${storageLink.store.getFreeCapacity(RESOURCE_ENERGY)}`);
+                    }              
+                    // 2. 其他情况下将STORAGE旁边的LINK能量传入STORAGE
+                    if(storageLink.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                        if(creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
+                            // 从storage附近的LINK获取能量
+                            if(creep.withdraw(storageLink, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                                creep.moveTo(storageLink, {visualizePathStyle: {stroke: '#ffaa00'}});
+                                creep.say('🔄 L→S');
+                            }
+                        } else {
+                            // 将能量转移到storage
+                            if(creep.transfer(creep.room.storage, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                                creep.moveTo(creep.room.storage, {visualizePathStyle: {stroke: '#ffffff'}});
+                                creep.say('🔄 L→S');
+                            }
+                        }
+                        return;
+                    }
+                } else {
+                    // 输出调试信息，检查LINK对象是否正确获取
+                    if(Game.time % 30 === 0) {
+                        console.log(`房间${creep.room.name} - LINK对象获取情况: Storage LINK ${storageLink ? '存在' : '不存在'}, Controller LINK ${controllerLink ? '存在' : '不存在'}`);
+                    }
+                }
+            }
+            
+            // 如果没有LINK任务，移动到房间中心等待
             creep.moveTo(new RoomPosition(25, 25, creep.room.name), {
                 visualizePathStyle: {stroke: '#ffaa00'},
                 range: 5
@@ -358,6 +398,75 @@ const roleTerminalHauler = {
         }
         
         creep.say('🕒');
+    },
+    
+    /**
+     * 检查并处理LINK能量任务
+     * @param {Creep} creep - 要检查的creep
+     * @returns {boolean} - 如果creep正在处理LINK能量任务返回true
+     */
+    checkAndHandleLinkEnergy: function(creep) {
+        // 检查是否需要处理LINK能量传输任务
+        if(!creep.room.memory.links || !creep.room.storage) {
+            return false;
+        }
+        
+        // 获取LINK对象
+        const storageLink = Game.getObjectById(creep.room.memory.links.storage);
+        
+        // 验证LINK对象
+        if(!storageLink) {
+            return false;
+        }
+        
+        // 获取当前LINK状态
+        const storageLinkEnergy = storageLink.store.getUsedCapacity(RESOURCE_ENERGY);
+        
+        // // 输出调试信息（每20tick输出一次）
+        // if(Game.time % 20 === 0) {
+        //     console.log(`Storage LINK 能量: ${storageLinkEnergy}/${storageLink.store.getUsedCapacity(RESOURCE_ENERGY) + storageLink.store.getFreeCapacity(RESOURCE_ENERGY)}`);
+        // }
+        
+        // 只处理从LINK到Storage的能量转移
+        // 如果Storage LINK有能量，将其搬到Storage
+        if(storageLinkEnergy >= 50) {
+            // 简单状态管理
+            if(!creep.memory.transferring && creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
+                // 从LINK取能量
+                if(creep.withdraw(storageLink, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                    creep.moveTo(storageLink, {visualizePathStyle: {stroke: '#ffaa00'}});
+                    creep.say('🔄 L→S');
+                    return true;
+                } else {
+                    // 成功取出能量，切换到存储状态
+                    creep.memory.transferring = true;
+                    return true;
+                }
+            } else if(creep.memory.transferring && creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                // 将能量存入Storage
+                if(creep.transfer(creep.room.storage, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                    creep.moveTo(creep.room.storage, {visualizePathStyle: {stroke: '#ffffff'}});
+                    creep.say('🔄 L→S');
+                    return true;
+                } else {
+                    // 成功存入Storage，重置状态
+                    creep.memory.transferring = false;
+                    return true;
+                }
+            } else if(creep.memory.transferring && creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
+                // 已经转移完毕，重置状态
+                creep.memory.transferring = false;
+            }
+            
+            // 如果有能量但还没开始取，或者正在转移中
+            if(storageLinkEnergy > 0 && 
+              ((creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0 && !creep.memory.transferring) || 
+               (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0 && creep.memory.transferring))) {
+                return true;
+            }
+        }
+        
+        return false; // 没有处理LINK能量任务
     },
     
     /**

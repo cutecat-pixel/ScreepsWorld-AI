@@ -30,6 +30,54 @@ global.signRoom = function(spawnRoomName, targetRoomName, signText) {
     return _roles.signer.createSignerTask(spawnRoomName, targetRoomName, signText);
 };
 
+// 添加Lab管理全局函数
+global.lab = {
+    // 设置房间的生产目标
+    setTarget: function(roomName, resourceType, amount = 3000) {
+        return _managers.lab.setRoomTarget(roomName, resourceType, amount);
+    },
+    
+    // 将资源添加到生产队列
+    addToQueue: function(roomName, resourceType, amount = 3000) {
+        return _managers.lab.addToQueue(roomName, resourceType, amount);
+    },
+    
+    // 清空生产队列
+    clearQueue: function(roomName) {
+        return _managers.lab.clearQueue(roomName);
+    },
+    
+    // 获取Lab系统状态
+    getStatus: function(roomName) {
+        return _managers.lab.getStatus(roomName);
+    },
+    
+    // 暂停实验室生产
+    pause: function(roomName) {
+        return _managers.lab.pauseProduction(roomName);
+    },
+    
+    // 恢复实验室生产
+    resume: function(roomName) {
+        return _managers.lab.resumeProduction(roomName);
+    },
+    
+    // 重新分配Lab角色
+    reassignLabs: function(roomName) {
+        return _managers.lab.reassignLabs(roomName);
+    },
+    
+    // 手动设置Lab为boost模式
+    setBoostMode: function(roomName, enabled = true) {
+        return _managers.lab.setBoostMode(roomName, enabled);
+    },
+    
+    // 设置指定Lab为boost Lab
+    setBoostLab: function(roomName, labId, resourceType) {
+        return _managers.lab.setBoostLab(roomName, labId, resourceType);
+    }
+};
+
 // 添加PowerCreep管理辅助函数
 global.enableRoom = function(powerCreepName, roomName) {
     const powerCreep = Game.powerCreeps[powerCreepName];
@@ -505,6 +553,15 @@ global.setPowerMinEnergy = function(roomName, level) {
     return _managers.powerSpawn.setMinEnergyLevel(roomName, level);
 };
 
+// 在main.js中添加
+global.enableResourceTrading = function(roomName, resourceType, minAmount = 1000, minPrice = 0) {
+    return _managers.terminal.enableResourceTrading(roomName, resourceType, minAmount, minPrice);
+};
+
+global.disableResourceTrading = function(roomName, resourceType) {
+    return _managers.terminal.disableResourceTrading(roomName, resourceType);
+};
+
 // 主循环
 module.exports.loop = function () {
     // 初始化移动优化系统（如果是第一次运行或重置）
@@ -555,70 +612,14 @@ module.exports.loop = function () {
     // 运行PowerCreep管理器
     _managers.powerCreep.run();
     
-    // 状态扫描
-    if(Game.time % 10 === 0) {
-        stateScanner();
-    }
-};
-
-// 状态扫描，每10tick运行一次，记录各房间能量和控制器等级状态
-const stateScanner = function () {
-    // 如果没有状态对象，创建
-    if(!Memory.stats) Memory.stats = {};
-    
-    // 记录当前CPU使用
-    Memory.stats.cpu = {
-        used: Game.cpu.getUsed(),
-        limit: Game.cpu.limit,
-        bucket: Game.cpu.bucket
-    };
-    
-    // 记录GCL (Global Control Level)
-    Memory.stats.gcl = {
-        level: Game.gcl.level,
-        progress: Game.gcl.progress,
-        progressTotal: Game.gcl.progressTotal
-    };
-    
-    // 记录GPL (Global Power Level)
-    Memory.stats.gpl = {
-        level: Game.gpl.level,
-        progress: Game.gpl.progress,
-        progressTotal: Game.gpl.progressTotal
-    };
-    
-    // 记录每个房间的状态
-    Memory.stats.rooms = {};
-    for(const name in Game.rooms) {
-        const room = Game.rooms[name];
-        
-        // 只记录我们控制的房间
-        if(room.controller && room.controller.my) {
-            Memory.stats.rooms[name] = {
-                energyAvailable: room.energyAvailable,
-                energyCapacityAvailable: room.energyCapacityAvailable,
-                controller: {
-                    level: room.controller.level,
-                    progress: room.controller.progress,
-                    progressTotal: room.controller.progressTotal
-                }
-            };
-            
-            // 记录storage信息
-            if(room.storage) {
-                Memory.stats.rooms[name].storage = {
-                    energy: room.storage.store[RESOURCE_ENERGY],
-                    power: room.storage.store[RESOURCE_POWER] || 0
-                };
-            }
-            
-            // 记录终端信息
-            if(room.terminal) {
-                Memory.stats.rooms[name].terminal = {
-                    energy: room.terminal.store[RESOURCE_ENERGY],
-                    power: room.terminal.store[RESOURCE_POWER] || 0
-                };
-            }
+    // 每100个tick报告一次统计信息
+    if(Game.time % 100 === 0) {
+        _managers.memory.reportStats();
+        // 当CPU bucket达到10000时生成pixel
+        if(Game.cpu.bucket >= 10000) {
+            Game.cpu.generatePixel();
+            console.log(`已使用10000 CPU bucket兑换1个pixel，当前bucket: ${Game.cpu.bucket}`);
         }
     }
 };
+
