@@ -112,48 +112,91 @@ const linkManager = {
      * @param {Room} room - 房间对象
      */
     manageLinks: function(room) {
+        // 在函数最开始添加日志，确认函数是否被调用以及针对哪个房间
+        // console.log(`[${room.name}] DEBUG: Entering manageLinks`); 
+
         // 检查控制器等级和是否有LINK结构
         if(room.controller.level < 5 || room.find(FIND_MY_STRUCTURES, {filter: {structureType: STRUCTURE_LINK}}).length === 0) return;
 
         // 确保links内存对象存在
         if(!room.memory.links) {
             this.initLinks(room);
+            // 初始化后可能需要等待下一tick才能获取到正确的enabled状态，或者在initLinks中设置默认值
+            // 当前initLinks已设置默认enabled:true
             return;
         }
 
-        // 检查是否初始化过LINK
-        if(!room.memory.links.storage && !room.memory.links.controller) {
-            this.initLinks(room);
-            return;
-        }
-
-        // 获取STORAGE旁边的LINK和控制器旁边的LINK
-        const storageLink = Game.getObjectById(room.memory.links.storage);
-        const controllerLink = Game.getObjectById(room.memory.links.controller);
-
-        // 如果没有STORAGE旁的LINK，返回
-        if(!storageLink) return;
-
-        // 控制器LINK能量传输（受enabled控制）
-        if(controllerLink && room.memory.links.enabled !== false) {
-        // 如果控制器旁的LINK能量不足，且STORAGE旁的LINK能量充足，传输能量
-        if(controllerLink.store.getUsedCapacity(RESOURCE_ENERGY) < 200 &&
-           storageLink.store.getUsedCapacity(RESOURCE_ENERGY) >= 400 &&
-           !storageLink.cooldown) {
-            storageLink.transferEnergy(controllerLink);
+        // --- 自动开关逻辑 --- 
+        const storage = room.storage;
+        if (storage) {
+            const storageEnergy = storage.store[RESOURCE_ENERGY] || 0;
+            const currentState = room.memory.links.enabled;
+            
+            // 能量高于阈值，自动开启
+            if (storageEnergy > 750000 && currentState === false) {
+                room.memory.links.enabled = true;
+                console.log(`房间 ${room.name}: Storage能量 (${storageEnergy}) > 750k，自动开启LINK传输`);
+            }
+            // 能量低于阈值，自动关闭
+            else if (storageEnergy < 700000 && currentState !== false) { // currentState可能为true或undefined
+                room.memory.links.enabled = false;
+                console.log(`房间 ${room.name}: Storage能量 (${storageEnergy}) < 700k，自动关闭LINK传输`);
             }
         }
+        // --- 自动开关逻辑结束 --- 
+
+        // 检查是否初始化过LINK (storage link必须存在)
+        if(!room.memory.links.storage) {
+            this.initLinks(room);
+            if(!room.memory.links.storage) {
+                 return; 
+            }
+        }
+        
+        const storageLinkId = room.memory.links.storage; // 先获取ID
+        // console.log(`[${room.name}] DEBUG: Attempting getObjectById for storage link ID: ${storageLinkId}`); // 打印尝试的ID
+        const storageLink = Game.getObjectById(storageLinkId); // 执行获取
+        // console.log(`[${room.name}] DEBUG: Result of getObjectById for storage link: ${storageLink}`); // 打印获取结果
+        
+        // 如果没有STORAGE旁的LINK，返回
+        if(!storageLink) {
+            // console.log(`[${room.name}] DEBUG: Exiting because storageLink object is null/undefined.`); // 增加退出日志
+            return; 
+        }
+
+        // console.log(`[${room.name}] DEBUG: Checking sources array: ${JSON.stringify(room.memory.links.sources)}`); 
 
         // 管理能源旁的LINK（将能量发送到STORAGE旁的LINK）- 不受enabled控制
         if(room.memory.links.sources.length > 0) {
             for(let sourceLinkId of room.memory.links.sources) {
                 const sourceLink = Game.getObjectById(sourceLinkId);
+                // if(sourceLink && storageLink) { // 确保两者都存在再记录
+                //      console.log(`[${room.name}] DEBUG Check: Source=${sourceLinkId}, SourceEnergy=${sourceLink.store.getUsedCapacity(RESOURCE_ENERGY)}, SourceCooldown=${sourceLink.cooldown}, StorageFree=${storageLink.store.getFreeCapacity(RESOURCE_ENERGY)}`);
+                // }
+                
+                // 原有的 if 条件
                 if(sourceLink &&
                    sourceLink.store.getUsedCapacity(RESOURCE_ENERGY) >= 700 &&
                    !sourceLink.cooldown &&
                    storageLink.store.getFreeCapacity(RESOURCE_ENERGY) >= 400) {
+                    // console.log(`[${room.name}] DEBUG: Attempting transfer from ${sourceLink.id} to ${storageLink.id}`); 
                     sourceLink.transferEnergy(storageLink);
                 }
+            }
+        }
+        // 控制器LINK能量传输（受enabled控制）
+        const controllerLink = Game.getObjectById(room.memory.links.controller); // 可能没有控制器LINK
+        // 移动到这里获取 controllerLink
+        if(controllerLink) { // 只有存在Controller Link时才执行传输
+             // 如果禁用了该房间的自动传输，则不执行controller link传输 (Source link传输不受影响)
+            if(room.memory.links.enabled === false) { 
+                return; // 如果禁用了，后面的代码（主要是controller link传输）也不用执行了
+            }
+            // 如果控制器旁的LINK能量不足，且STORAGE旁的LINK能量充足，传输能量
+            if(controllerLink.store.getUsedCapacity(RESOURCE_ENERGY) < 200 &&
+               storageLink.store.getUsedCapacity(RESOURCE_ENERGY) >= 400 &&
+               !storageLink.cooldown) {
+                storageLink.transferEnergy(controllerLink);
             }
         }
     },
